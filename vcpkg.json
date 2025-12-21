@@ -1,0 +1,24 @@
+{
+  "name" : "pacmangame",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "f5800a22acb14d7f753e8be12fe5ec2bc999ab44",
+  "dependencies" : [ {
+    "name" : "vcpkg-cmake-config",
+    "version>=" : "2024-05-23"
+  }, {
+    "name" : "vcpkg-cmake",
+    "version>=" : "2024-04-23"
+  }, {
+    "name" : "sdl2",
+    "version>=" : "2.32.8"
+  }, {
+    "name" : "sdl2-mixer",
+    "version>=" : "2.8.1#1"
+  }, {
+    "name" : "sdl2-image",
+    "version>=" : "2.8.8#1"
+  }, {
+    "name" : "sdl2-ttf",
+    "version>=" : "2.24.0"
+  } ]
+}
