@@ -23,7 +23,6 @@ Recreation of the original Pac-Man game from the clasic arcade era (1980) writte
 | `fruit.wav`       | A fruit is eaten                               |
 | `siren.ogg`       | Background siren                               |
 | `siren2.ogg`      | Sped up siren (certain amount of pellets left) |
-| `high-score.ogg`  | Al superar el high score                       |
 
 ## Sprites used
 
@@ -191,7 +190,6 @@ Recreación fiel del juego arcade clásico Pac-Man (1980) usando C++ y SDL2.
 | `fruit.wav`       | Al comer la cereza                       |
 | `siren.ogg`       | Sirena de fondo durante el juego         |
 | `siren2.ogg`      | Sirena rápida (cuando quedan pocos dots) |
-| `high-score.ogg`  | Al superar el high score                 |
 
 ## Gráficos Utilizados
 
