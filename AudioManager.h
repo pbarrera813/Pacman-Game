@@ -17,7 +17,9 @@ enum class SoundID {
     Siren,          // Sirena normal
     SirenFast,      // Sirena rápida
     HighScore,      // Nuevo high score
-    Pause           // Sonido de pausa
+    Pause,          // Sonido de pausa
+    Unpause,        // Sonido de despausar
+    Success         // Sonido de éxito (reset high score)
 };
 
 class AudioManager {
@@ -51,8 +53,11 @@ private:
     std::unordered_map<SoundID, Mix_Chunk*> sounds;
     std::unordered_map<SoundID, int> activeChannels;
     
-    static constexpr int WAKA_CHANNEL = 0;  // Canal dedicado para waka
-    static constexpr int SIREN_CHANNEL = 1; // Canal dedicado para sirena
+    static constexpr int WAKA_CHANNEL = 0;     // Canal dedicado para waka
+    static constexpr int SIREN_CHANNEL = 1;    // Canal dedicado para sirena
+    static constexpr int B2B_CHANNEL = 2;      // Canal dedicado para ojos volviendo a casa
+    static constexpr int FRUIT_CHANNEL = 3;    // Canal dedicado para sonido de fruta
+    static constexpr int HIGHSCORE_CHANNEL = 4; // Canal dedicado para nuevo récord
     
     bool sirenPlaying = false;
     bool sirenFast = false;
