@@ -20,6 +20,7 @@ Ghost::Ghost(GhostType t) : type(t) {
 void Ghost::reset() {
     mode = GhostMode::Scatter;
     speed = GHOST_SPEED;
+    speedMultiplier = 1.0f;
     enteringHouse = false;
     exitPhase = 0;
     
@@ -305,9 +306,9 @@ void Ghost::update(float dt) {
     }
     
     // Velocidad (más lento en túneles excepto en modo Eyes)
-    float currentSpeed = speed;
+    float currentSpeed = speed * speedMultiplier;  // Aplicar multiplicador de nivel
     if (mode != GhostMode::Eyes && Map::get().isTunnel(getTileX(), getTileY())) {
-        currentSpeed = GHOST_TUNNEL_SPEED;
+        currentSpeed = GHOST_TUNNEL_SPEED * speedMultiplier;
     }
     
     // Mover

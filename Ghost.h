@@ -38,6 +38,7 @@ public:
     // Setters
     void setMode(GhostMode m);
     void setTarget(const Vector2& t) { target = t; }
+    void setSpeedMultiplier(float mult) { speedMultiplier = mult; }
     
     // Control
     void reverseDirection();
@@ -57,6 +58,7 @@ public:
 private:
     GhostType type;
     GhostMode mode = GhostMode::Scatter;
+    float speedMultiplier = 1.0f;
     
     Vector2 target;
     
