@@ -5,6 +5,7 @@
 #include "Math.h"
 #include "Direction.h"
 #include "Constants.h"
+#include <cmath>
 
 class Entity {
 public:
@@ -31,10 +32,18 @@ public:
         return static_cast<int>((position.y / SCALE + TILE_SIZE / 2) / TILE_SIZE);
     }
     
-    // Verificar si está centrado en un tile
+    // Verificar si está centrado en un tile (con tolerancia)
     bool isCentered() const {
-        int px = static_cast<int>(position.x / SCALE);
-        int py = static_cast<int>(position.y / SCALE);
-        return (px % TILE_SIZE == 0) && (py % TILE_SIZE == 0);
+        float tileSize = static_cast<float>(TILE_SIZE * SCALE);
+        float offsetX = std::fmod(position.x, tileSize);
+        float offsetY = std::fmod(position.y, tileSize);
+        
+        // Tolerancia de 3 píxeles escalados
+        float tolerance = 3.0f;
+        
+        bool centeredX = (offsetX <= tolerance) || (offsetX >= tileSize - tolerance);
+        bool centeredY = (offsetY <= tolerance) || (offsetY >= tileSize - tolerance);
+        
+        return centeredX && centeredY;
     }
 };
