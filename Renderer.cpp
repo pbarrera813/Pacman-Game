@@ -140,6 +140,64 @@ void Renderer::drawMaze() {
     }
 }
 
+void Renderer::drawMazeFlashing(bool whiteState) {
+    // Color: azul normal o blanco
+    Uint8 r, g, b;
+    if (whiteState) {
+        r = 255; g = 255; b = 255;  // Blanco
+    } else {
+        r = 33; g = 33; b = 222;    // Azul normal
+    }
+    
+    for (int y = 0; y < MAP_HEIGHT; y++) {
+        for (int x = 0; x < MAP_WIDTH; x++) {
+            TileType tile = Map::get().getTile(x, y);
+            
+            if (tile == TileType::Wall) {
+                SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+                
+                int px = x * SCALED_TILE;
+                int py = y * SCALED_TILE + GAME_OFFSET_Y;
+                
+                bool wallUp = Map::get().getTile(x, y - 1) == TileType::Wall;
+                bool wallDown = Map::get().getTile(x, y + 1) == TileType::Wall;
+                bool wallLeft = Map::get().getTile(x - 1, y) == TileType::Wall;
+                bool wallRight = Map::get().getTile(x + 1, y) == TileType::Wall;
+                
+                int border = 2 * SCALE;
+                
+                if (!wallUp) {
+                    SDL_Rect rect = {px, py, SCALED_TILE, border};
+                    SDL_RenderFillRect(renderer, &rect);
+                }
+                if (!wallDown) {
+                    SDL_Rect rect = {px, py + SCALED_TILE - border, SCALED_TILE, border};
+                    SDL_RenderFillRect(renderer, &rect);
+                }
+                if (!wallLeft) {
+                    SDL_Rect rect = {px, py, border, SCALED_TILE};
+                    SDL_RenderFillRect(renderer, &rect);
+                }
+                if (!wallRight) {
+                    SDL_Rect rect = {px + SCALED_TILE - border, py, border, SCALED_TILE};
+                    SDL_RenderFillRect(renderer, &rect);
+                }
+            }
+            else if (tile == TileType::GhostDoor) {
+                // Puerta también parpadea
+                SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+                SDL_Rect rect = {
+                    x * SCALED_TILE,
+                    y * SCALED_TILE + GAME_OFFSET_Y + SCALED_TILE / 3,
+                    SCALED_TILE,
+                    SCALED_TILE / 3
+                };
+                SDL_RenderFillRect(renderer, &rect);
+            }
+        }
+    }
+}
+
 void Renderer::drawDots() {
     auto& tm = TextureManager::get();
     
@@ -183,13 +241,17 @@ void Renderer::drawNumber(int number, int x, int y) {
     SDL_FreeSurface(surface);
 }
 
-void Renderer::drawScore(int score, int highScore, int /*lives*/) {
+void Renderer::drawScore(int score, int highScore, int /*lives*/, bool blinkScore) {
     if (!font) return;
     
     SDL_Color white = {255, 255, 255, 255};
+    SDL_Color yellow = {255, 255, 0, 255};
+    
+    // Si está parpadeando, alternar color
+    SDL_Color scoreColor = blinkScore ? yellow : white;
     
     // "1UP"
-    SDL_Surface* surf1 = TTF_RenderText_Solid(font, "1UP", white);
+    SDL_Surface* surf1 = TTF_RenderText_Solid(font, "1UP", scoreColor);
     if (surf1) {
         SDL_Texture* tex1 = SDL_CreateTextureFromSurface(renderer, surf1);
         if (tex1) {
@@ -200,10 +262,26 @@ void Renderer::drawScore(int score, int highScore, int /*lives*/) {
         SDL_FreeSurface(surf1);
     }
     
-    drawNumber(score, 1 * SCALED_TILE, 8 * SCALE);
+    // Score actual (puede parpadear)
+    if (!blinkScore) {
+        drawNumber(score, 1 * SCALED_TILE, 8 * SCALE);
+    } else {
+        // Dibujar con color amarillo
+        std::string text = std::to_string(score);
+        SDL_Surface* surfScore = TTF_RenderText_Solid(font, text.c_str(), yellow);
+        if (surfScore) {
+            SDL_Texture* texScore = SDL_CreateTextureFromSurface(renderer, surfScore);
+            if (texScore) {
+                SDL_Rect dst = {1 * SCALED_TILE, 8 * SCALE, surfScore->w, surfScore->h};
+                SDL_RenderCopy(renderer, texScore, nullptr, &dst);
+                SDL_DestroyTexture(texScore);
+            }
+            SDL_FreeSurface(surfScore);
+        }
+    }
     
     // "HIGH SCORE"
-    SDL_Surface* surf2 = TTF_RenderText_Solid(font, "HIGH SCORE", white);
+    SDL_Surface* surf2 = TTF_RenderText_Solid(font, "HIGH SCORE", scoreColor);
     if (surf2) {
         SDL_Texture* tex2 = SDL_CreateTextureFromSurface(renderer, surf2);
         if (tex2) {
@@ -214,7 +292,22 @@ void Renderer::drawScore(int score, int highScore, int /*lives*/) {
         SDL_FreeSurface(surf2);
     }
     
-    drawNumber(highScore, 13 * SCALED_TILE, 8 * SCALE);
+    // High Score (puede parpadear)
+    if (!blinkScore) {
+        drawNumber(highScore, 13 * SCALED_TILE, 8 * SCALE);
+    } else {
+        std::string text = std::to_string(highScore);
+        SDL_Surface* surfHigh = TTF_RenderText_Solid(font, text.c_str(), yellow);
+        if (surfHigh) {
+            SDL_Texture* texHigh = SDL_CreateTextureFromSurface(renderer, surfHigh);
+            if (texHigh) {
+                SDL_Rect dst = {13 * SCALED_TILE, 8 * SCALE, surfHigh->w, surfHigh->h};
+                SDL_RenderCopy(renderer, texHigh, nullptr, &dst);
+                SDL_DestroyTexture(texHigh);
+            }
+            SDL_FreeSurface(surfHigh);
+        }
+    }
 }
 
 void Renderer::drawLives(int lives) {

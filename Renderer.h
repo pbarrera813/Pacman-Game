@@ -19,9 +19,10 @@ public:
     void present();
     
     // Dibujar
-    void drawMaze();           // Dibujar laberinto con código
+    void drawMaze();                        // Dibujar laberinto con código
+    void drawMazeFlashing(bool whiteState); // Para animación Level Clear
     void drawDots();
-    void drawScore(int score, int highScore, int lives);
+    void drawScore(int score, int highScore, int lives, bool blinkScore = false);
     void drawText(const std::string& textureId, int x, int y);
     void drawLives(int lives);
     void drawFruit();
