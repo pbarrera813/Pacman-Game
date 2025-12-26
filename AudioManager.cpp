@@ -28,6 +28,8 @@ bool AudioManager::init() {
     loadSound(SoundID::SirenFast,   "assets/sounds/siren2.ogg");
     loadSound(SoundID::HighScore,   "assets/sounds/high-score.ogg");
     loadSound(SoundID::Pause,       "assets/sounds/pause.wav");
+    loadSound(SoundID::Unpause,     "assets/sounds/unpause.wav");
+    loadSound(SoundID::Success,     "assets/sounds/success.wav");
     
     return true;
 }
@@ -81,6 +83,28 @@ void AudioManager::playSound(SoundID id, int loops) {
         return;
     }
     
+    // BackToBase usa canal dedicado
+    if (id == SoundID::BackToBase) {
+        if (!Mix_Playing(B2B_CHANNEL)) {
+            channel = Mix_PlayChannel(B2B_CHANNEL, it->second, loops);
+        }
+        return;
+    }
+    
+    // Fruta usa canal dedicado para evitar que se corte
+    if (id == SoundID::Fruit) {
+        Mix_HaltChannel(FRUIT_CHANNEL);  // Detener cualquier sonido anterior
+        channel = Mix_PlayChannel(FRUIT_CHANNEL, it->second, loops);
+        return;
+    }
+    
+    // HighScore usa canal dedicado para asegurar reproducción
+    if (id == SoundID::HighScore) {
+        Mix_HaltChannel(HIGHSCORE_CHANNEL);  // Detener cualquier sonido anterior
+        channel = Mix_PlayChannel(HIGHSCORE_CHANNEL, it->second, loops);
+        return;
+    }
+    
     // Otros sonidos usan canales libres
     channel = Mix_PlayChannel(-1, it->second, loops);
     if (channel != -1) {
@@ -97,6 +121,11 @@ void AudioManager::stopSound(SoundID id) {
     if (id == SoundID::Siren || id == SoundID::SirenFast) {
         Mix_HaltChannel(SIREN_CHANNEL);
         sirenPlaying = false;
+        return;
+    }
+    
+    if (id == SoundID::BackToBase) {
+        Mix_HaltChannel(B2B_CHANNEL);
         return;
     }
     
@@ -136,6 +165,9 @@ bool AudioManager::isPlaying(SoundID id) const {
     }
     if (id == SoundID::Siren || id == SoundID::SirenFast) {
         return Mix_Playing(SIREN_CHANNEL) != 0;
+    }
+    if (id == SoundID::BackToBase) {
+        return Mix_Playing(B2B_CHANNEL) != 0;
     }
     
     auto it = activeChannels.find(id);
