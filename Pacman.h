@@ -15,6 +15,7 @@ public:
     
     // Control
     void setDesiredDirection(Direction dir);
+    void setSpeedMultiplier(float mult) { speedMultiplier = mult; }
     
     // Estado
     bool isAlive() const { return alive; }
@@ -36,6 +37,7 @@ public:
     
 private:
     Direction desiredDirection = Direction::Left;
+    float speedMultiplier = 1.0f;
     
     bool alive = true;
     bool eating = false;
