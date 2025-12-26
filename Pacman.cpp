@@ -2,7 +2,6 @@
 #include "Pacman.h"
 #include "Map.h"
 #include "Constants.h"
-#include "AudioManager.h"
 
 PacMan::PacMan() {
     reset();
@@ -16,6 +15,7 @@ void PacMan::reset() {
     direction = Direction::Left;
     desiredDirection = Direction::Left;
     speed = PACMAN_SPEED;
+    speedMultiplier = 1.0f;
     
     alive = true;
     eating = false;
@@ -90,7 +90,7 @@ void PacMan::update(float dt) {
         if (Map::get().eatDot(tx, ty)) {
             ateDot = true;
             eating = true;
-            AudioManager::get().playSound(SoundID::Waka);
+            // El sonido waka se maneja en Game.cpp
         }
         else if (Map::get().eatPowerPellet(tx, ty)) {
             atePowerPellet = true;
@@ -101,6 +101,7 @@ void PacMan::update(float dt) {
     // Movimiento
     if (direction != Direction::None) {
         float moveSpeed = eating ? PACMAN_DOT_SPEED : speed;
+        moveSpeed *= speedMultiplier;  // Aplicar multiplicador de nivel
         float move = moveSpeed * dt;
         
         switch (direction) {
