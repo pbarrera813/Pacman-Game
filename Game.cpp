@@ -1,4 +1,4 @@
-// Game.cpp
+// Game.cpp - Pac-Man Versión Final
 #include "Game.h"
 #include "GhostAI.h"
 #include "Map.h"
@@ -8,6 +8,7 @@
 #include <cmath>
 #include <iostream>
 #include <algorithm>
+#include <fstream>
 
 // Función para dibujar dígitos simples
 static void drawDigitSimple(SDL_Renderer* renderer, char digit, int x, int y, int scale);
@@ -19,6 +20,7 @@ static const float CHASE_TIMES[] = {20.0f, 20.0f, 20.0f, 999999.0f};
 Game::Game() {}
 
 Game::~Game() {
+    saveHighScore();
     AudioManager::get().shutdown();
 }
 
@@ -32,6 +34,10 @@ bool Game::init() {
     loadAllTextures();
     AudioManager::get().init();
     
+    // Cargar high score guardado
+    loadHighScore();
+    previousHighScore = highScore;
+    
     // Crear fantasmas
     ghosts.push_back(Ghost(GhostType::Blinky));
     ghosts.push_back(Ghost(GhostType::Pinky));
@@ -42,6 +48,35 @@ bool Game::init() {
     state = GameState::PressStart;
     
     return true;
+}
+
+void Game::loadHighScore() {
+    std::ifstream file(HIGHSCORE_FILE, std::ios::binary);
+    if (file.is_open()) {
+        file.read(reinterpret_cast<char*>(&highScore), sizeof(highScore));
+        file.close();
+    } else {
+        highScore = 0;
+    }
+}
+
+void Game::saveHighScore() {
+    std::ofstream file(HIGHSCORE_FILE, std::ios::binary);
+    if (file.is_open()) {
+        file.write(reinterpret_cast<const char*>(&highScore), sizeof(highScore));
+        file.close();
+    }
+}
+
+void Game::resetHighScore() {
+    highScore = 0;
+    previousHighScore = 0;
+    highScoreBeaten = false;
+    saveHighScore();
+    
+    // Activar parpadeo de confirmación
+    highScoreResetBlinkTimer = 1.5f;
+    AudioManager::get().playSound(SoundID::Success);
 }
 
 void Game::loadAllTextures() {
@@ -78,12 +113,15 @@ void Game::loadAllTextures() {
     tm.load("ghost_eyes_left", "assets/gfx/ghost/eyes/eyes_left.png");
     tm.load("ghost_eyes_right", "assets/gfx/ghost/eyes/eyes_right.png");
     
-    // Pills (IMPORTANTE: usar los sprites)
+    // Pills
     tm.load("pill", "assets/gfx/pill/pill_0.png");
     tm.load("super_pill", "assets/gfx/pill/pill_1.png");
     
-    // Cherry
-    tm.load("cherry", "assets/gfx/cherry/spr_cherry_0.png");
+    // Frutas
+    tm.load("fruit_cherry", "assets/gfx/cherry/spr_cherry_0.png");
+    tm.load("fruit_strawberry", "assets/gfx/cherry/spr_strawberry_0.png");
+    tm.load("fruit_orange", "assets/gfx/cherry/spr_orange_0.png");
+    tm.load("fruit_apple", "assets/gfx/cherry/spr_apple_0.png");
     
     // Textos
     tm.load("text_ready", "assets/gfx/pacman_text/ready.png");
@@ -91,6 +129,41 @@ void Game::loadAllTextures() {
     tm.load("text_clear", "assets/gfx/pacman_text/clear.png");
     tm.load("text_pressstart", "assets/gfx/pacman_text/enter_0.png");
     tm.load("text_pause", "assets/gfx/pacman_text/pause.png");
+}
+
+FruitInfo Game::getCurrentFruitInfo() const {
+    FruitInfo info;
+    
+    switch (level) {
+        case 1:
+            info.type = FruitType::Cherry;
+            info.textureKey = "fruit_cherry";
+            info.points = 100;
+            break;
+        case 2:
+            info.type = FruitType::Strawberry;
+            info.textureKey = "fruit_strawberry";
+            info.points = 200;
+            break;
+        case 3:
+        case 4:
+            info.type = FruitType::Orange;
+            info.textureKey = "fruit_orange";
+            info.points = 500;
+            break;
+        default:  // Nivel 5+
+            info.type = FruitType::Apple;
+            info.textureKey = "fruit_apple";
+            info.points = 700;
+            break;
+    }
+    
+    return info;
+}
+
+float Game::getSpeedMultiplier() const {
+    float multiplier = 1.0f + (std::min(level - 1, 6) * 0.05f);
+    return multiplier;
 }
 
 void Game::handleInput() {
@@ -122,18 +195,34 @@ void Game::handleInput() {
                         pacman.setDesiredDirection(Direction::Right);
                     break;
                     
+                case SDLK_r:
+                    // Reset high score (en PressStart, GameOver o Paused)
+                    if (state == GameState::PressStart || 
+                        state == GameState::GameOver ||
+                        state == GameState::Paused) {
+                        resetHighScore();
+                    }
+                    break;
+                    
                 case SDLK_RETURN:
                     if (state == GameState::PressStart) {
-                        // Iniciar juego
                         state = GameState::Startup;
                         stateTimer = 0.0f;
                         AudioManager::get().playSound(SoundID::Startup);
                     }
                     else if (state == GameState::GameOver) {
-                        // Reiniciar
+                        // Guardar el récord actual como el récord a batir
+                        previousHighScore = highScore;
+                        // Reiniciar flags de high score para la nueva partida
+                        highScoreBeaten = false;
+                        highScoreBlinkTimer = 0.0f;
+                        highScoreBlinkAccum = 0.0f;
+                        highScoreBlinkState = false;
+                        // Reiniciar partida
                         score = 0;
                         lives = 3;
                         level = 1;
+                        collectedFruits.clear();
                         Map::get().resetLevel();
                         startLevel();
                     }
@@ -141,15 +230,20 @@ void Game::handleInput() {
                     
                 case SDLK_ESCAPE:
                     if (state == GameState::Playing) {
-                        // Pausar
                         stateBeforePause = state;
                         state = GameState::Paused;
-                        AudioManager::get().playSound(SoundID::Pause);
+                        // Primero detener sonidos de gameplay
                         AudioManager::get().stopSiren();
+                        AudioManager::get().stopSound(SoundID::Waka);
+                        AudioManager::get().stopSound(SoundID::BackToBase);
+                        // Luego reproducir sonido de pausa
+                        AudioManager::get().playSound(SoundID::Pause);
                     }
                     else if (state == GameState::Paused) {
-                        // Despausar
                         state = stateBeforePause;
+                        // Reproducir sonido de despausar
+                        AudioManager::get().playSound(SoundID::Unpause);
+                        // Reanudar sirena si corresponde
                         if (frightenedTimer <= 0.0f) {
                             AudioManager::get().playSiren(sirenFast);
                         }
@@ -168,6 +262,7 @@ void Game::startLevel() {
     dotsEaten = 0;
     fruitVisible = false;
     fruitEaten = false;
+    fruitRespawnTimer = 0.0f;
     frightenedTimer = 0.0f;
     ghostsEatenInFright = 0;
     floatingScores.clear();
@@ -182,8 +277,11 @@ void Game::startLevel() {
 
 void Game::resetPositions() {
     pacman.reset();
+    pacman.setSpeedMultiplier(getSpeedMultiplier());
+    
     for (auto& ghost : ghosts) {
         ghost.reset();
+        ghost.setSpeedMultiplier(getSpeedMultiplier());
     }
 }
 
@@ -195,9 +293,25 @@ void Game::update(float dt) {
         blinkState = !blinkState;
     }
     
+    // Actualizar parpadeos
+    updateHighScoreBlink(dt);
+    
+    // Parpadeo de reset de high score
+    if (highScoreResetBlinkTimer > 0.0f) {
+        highScoreResetBlinkTimer -= dt;
+        static float resetBlinkAccum = 0.0f;
+        resetBlinkAccum += dt;
+        if (resetBlinkAccum >= 0.1f) {
+            resetBlinkAccum = 0.0f;
+            highScoreResetBlinkState = !highScoreResetBlinkState;
+        }
+        if (highScoreResetBlinkTimer <= 0.0f) {
+            highScoreResetBlinkState = false;
+        }
+    }
+    
     switch (state) {
         case GameState::PressStart:
-            // Solo esperar input
             break;
             
         case GameState::Startup:
@@ -220,7 +334,31 @@ void Game::update(float dt) {
             break;
             
         case GameState::Paused:
-            // No actualizar nada
+            break;
+            
+        case GameState::GhostEaten:
+            // Congelado después de comer fantasma
+            freezeTimer -= dt;
+            if (freezeTimer <= 0.0f) {
+                state = GameState::Playing;
+                // b2b.wav ya está sonando desde eatGhost()
+                // Reanudar sirena si no hay modo frightened activo
+                if (frightenedTimer <= 0.0f) {
+                    AudioManager::get().playSiren(sirenFast);
+                }
+            }
+            // Actualizar solo puntajes flotantes durante el freeze
+            updateFloatingScores(dt);
+            break;
+            
+        case GameState::PreDeath:
+            // Pausa antes de animación de muerte
+            freezeTimer -= dt;
+            if (freezeTimer <= 0.0f) {
+                state = GameState::Death;
+                AudioManager::get().playSound(SoundID::Death);
+                pacman.die();
+            }
             break;
             
         case GameState::Death:
@@ -229,6 +367,7 @@ void Game::update(float dt) {
                 lives--;
                 if (lives <= 0) {
                     state = GameState::GameOver;
+                    saveHighScore();
                 }
                 else {
                     resetPositions();
@@ -239,37 +378,54 @@ void Game::update(float dt) {
             break;
             
         case GameState::LevelClear:
-            stateTimer -= dt;
-            if (stateTimer <= 0.0f) {
-                level++;
-                Map::get().resetLevel();
-                startLevel();
-            }
+            updateLevelClearAnimation(dt);
             break;
             
         case GameState::GameOver:
-            // Esperar input
             break;
+    }
+}
+
+void Game::updateLevelClearAnimation(float dt) {
+    levelClearTimer += dt;
+    levelClearBlinkTimer += dt;
+    
+    if (levelClearBlinkTimer >= LEVEL_CLEAR_BLINK_SPEED) {
+        levelClearBlinkTimer = 0.0f;
+        levelClearBlinkState = !levelClearBlinkState;
+    }
+    
+    if (levelClearTimer >= LEVEL_CLEAR_DURATION) {
+        level++;
+        
+        FruitInfo fruitInfo = getCurrentFruitInfo();
+        
+        if (collectedFruits.size() >= 5) {
+            collectedFruits.erase(collectedFruits.begin());
+        }
+        collectedFruits.push_back(fruitInfo.type);
+        
+        Map::get().resetLevel();
+        startLevel();
     }
 }
 
 void Game::updatePlaying(float dt) {
     updateScatterChaseMode(dt);
     
-    // Guardar si estaba comiendo
-    bool wasEating = pacman.ateDot || pacman.atePowerPellet;
-    
     pacman.update(dt);
     
-    // Sonido waka: reproducir si está comiendo
+    // Reproducir waka SOLO cuando come un pellet
     if (pacman.ateDot || pacman.atePowerPellet) {
         AudioManager::get().playSound(SoundID::Waka);
     }
+    // NO detener waka aquí - dejar que termine naturalmente
     
     // Puntuación por dot
     if (pacman.ateDot) {
         score += SCORE_DOT;
         dotsEaten++;
+        checkHighScore();
         spawnFruit();
     }
     
@@ -277,6 +433,7 @@ void Game::updatePlaying(float dt) {
     if (pacman.atePowerPellet) {
         score += SCORE_POWER_PELLET;
         dotsEaten++;
+        checkHighScore();
         activateFrightenedMode();
         spawnFruit();
     }
@@ -307,6 +464,24 @@ void Game::updatePlaying(float dt) {
         }
     }
     
+    // Verificar si hay fantasmas en modo Eyes
+    bool anyEyes = false;
+    for (auto& ghost : ghosts) {
+        if (ghost.getMode() == GhostMode::Eyes) {
+            anyEyes = true;
+            break;
+        }
+    }
+    
+    // Mantener b2b.wav sonando mientras haya ojos
+    if (anyEyes) {
+        if (!AudioManager::get().isPlaying(SoundID::BackToBase)) {
+            AudioManager::get().playSound(SoundID::BackToBase, -1);
+        }
+    } else {
+        AudioManager::get().stopSound(SoundID::BackToBase);
+    }
+    
     // Actualizar fantasmas
     Ghost* blinky = &ghosts[0];
     for (auto& ghost : ghosts) {
@@ -319,11 +494,52 @@ void Game::updatePlaying(float dt) {
     updateSiren();
     checkLevelComplete();
     
-    // Fruta timer
+    // Timer de fruta visible
     if (fruitVisible) {
         fruitTimer -= dt;
         if (fruitTimer <= 0.0f) {
             fruitVisible = false;
+        }
+    }
+    
+    // Timer de respawn de fruta (35 segundos después de ser comida)
+    if (fruitEaten && !fruitVisible) {
+        fruitRespawnTimer += dt;
+        if (fruitRespawnTimer >= FRUIT_RESPAWN_TIME) {
+            fruitVisible = true;
+            fruitTimer = FRUIT_VISIBLE_TIME;
+            fruitRespawnTimer = 0.0f;
+            fruitEaten = false;  // Reset para permitir otro respawn
+        }
+    }
+}
+
+void Game::checkHighScore() {
+    if (previousHighScore > 0 && !highScoreBeaten && score > previousHighScore) {
+        highScoreBeaten = true;
+        highScoreBlinkTimer = 2.0f;
+        AudioManager::get().playSound(SoundID::HighScore);
+    }
+    
+    if (score > highScore) {
+        highScore = score;
+    }
+}
+
+void Game::updateHighScoreBlink(float dt) {
+    if (highScoreBlinkTimer > 0.0f) {
+        highScoreBlinkTimer -= dt;
+        
+        // Usar acumulador miembro, no variable static
+        highScoreBlinkAccum += dt;
+        if (highScoreBlinkAccum >= 0.1f) {
+            highScoreBlinkAccum = 0.0f;
+            highScoreBlinkState = !highScoreBlinkState;
+        }
+        
+        if (highScoreBlinkTimer <= 0.0f) {
+            highScoreBlinkState = false;
+            highScoreBlinkAccum = 0.0f;
         }
     }
 }
@@ -349,38 +565,40 @@ void Game::updateScatterChaseMode(float dt) {
         GhostMode newMode = inScatterMode ? GhostMode::Scatter : GhostMode::Chase;
         for (auto& ghost : ghosts) {
             if (ghost.getMode() != GhostMode::Frightened && 
-                ghost.getMode() != GhostMode::Eyes &&
-                !ghost.isInHouse()) {
+                ghost.getMode() != GhostMode::Eyes) {
                 ghost.setMode(newMode);
-                ghost.reverseDirection();
             }
         }
     }
 }
 
 void Game::activateFrightenedMode() {
-    AudioManager::get().stopSiren();
-    AudioManager::get().playSound(SoundID::PowerUp);
-    
     frightenedTimer = FRIGHTENED_TIME;
     ghostsEatenInFright = 0;
     
     for (auto& ghost : ghosts) {
-        if (ghost.getMode() != GhostMode::Eyes && !ghost.isInHouse()) {
+        if (ghost.getMode() != GhostMode::Eyes) {
             ghost.setMode(GhostMode::Frightened);
         }
     }
+    
+    AudioManager::get().stopSiren();
+    AudioManager::get().playSound(SoundID::PowerUp);
 }
 
 void Game::checkCollisions() {
+    int pacTileX = pacman.getTileX();
+    int pacTileY = pacman.getTileY();
+    
+    // Colisión con fantasmas
     for (auto& ghost : ghosts) {
-        if (ghost.isInHouse()) continue;
+        int ghostTileX = ghost.getTileX();
+        int ghostTileY = ghost.getTileY();
         
-        float dist = pacman.position.distance(ghost.position);
-        
-        if (dist < SCALED_TILE * 0.7f) {
+        if (pacTileX == ghostTileX && pacTileY == ghostTileY) {
             if (ghost.getMode() == GhostMode::Frightened) {
                 eatGhost(ghost);
+                return;  // Importante: salir para evitar múltiples colisiones
             }
             else if (ghost.getMode() != GhostMode::Eyes) {
                 pacmanDied();
@@ -389,57 +607,98 @@ void Game::checkCollisions() {
         }
     }
     
-    // Colisión con fruta
+    // Colisión con fruta - usar detección más precisa
     if (fruitVisible) {
-        float fruitX = 13.5f * SCALED_TILE;
-        float fruitY = 17 * SCALED_TILE;
+        // La fruta está en el centro del mapa, tile (13, 17)
+        // Verificar si Pac-Man está cerca de la fruta
+        float fruitX = 13.5f * SCALED_TILE;  // Centro entre tiles 13-14
+        float fruitY = 17.0f * SCALED_TILE;
         
-        float dist = std::sqrt(
-            std::pow(pacman.position.x - fruitX, 2) +
-            std::pow(pacman.position.y - fruitY, 2)
-        );
+        float pacCenterX = pacman.position.x + SCALED_TILE / 2.0f;
+        float pacCenterY = pacman.position.y + SCALED_TILE / 2.0f;
         
-        if (dist < SCALED_TILE) {
+        float dx = pacCenterX - fruitX;
+        float dy = pacCenterY - fruitY;
+        float distance = std::sqrt(dx * dx + dy * dy);
+        
+        // Si está dentro de medio tile, comer la fruta
+        if (distance < SCALED_TILE * 0.6f) {
+            FruitInfo fruitInfo = getCurrentFruitInfo();
+            score += fruitInfo.points;
+            checkHighScore();
+            addFloatingScore(fruitInfo.points, pacman.position.x, pacman.position.y);
+            
+            // Reproducir sonido de fruta
+            AudioManager::get().playSound(SoundID::Fruit);
+            
             fruitVisible = false;
             fruitEaten = true;
-            score += SCORE_CHERRY;
-            addFloatingScore(SCORE_CHERRY, fruitX, fruitY);
-            AudioManager::get().playSound(SoundID::Fruit);
+            fruitRespawnTimer = 0.0f;
         }
     }
 }
 
 void Game::eatGhost(Ghost& ghost) {
+    // Primero calcular puntos
+    int points;
+    switch (ghostsEatenInFright) {
+        case 0: points = SCORE_GHOST_1; break;
+        case 1: points = SCORE_GHOST_2; break;
+        case 2: points = SCORE_GHOST_3; break;
+        default: points = SCORE_GHOST_4; break;
+    }
+    
+    score += points;
+    checkHighScore();
     ghostsEatenInFright++;
     
-    int ghostScore = SCORE_GHOST_1 * (1 << (ghostsEatenInFright - 1));
-    score += ghostScore;
+    addFloatingScore(points, ghost.position.x, ghost.position.y);
     
-    addFloatingScore(ghostScore, ghost.position.x, ghost.position.y);
+    // Enviar fantasma a casa (modo Eyes)
+    ghost.sendToHouse();
     
+    // Detener sirena y waka durante el freeze
+    AudioManager::get().stopSiren();
+    AudioManager::get().stopSound(SoundID::Waka);
+    
+    // Reproducir sonido de comer fantasma DESPUÉS de detener otros
     AudioManager::get().playSound(SoundID::GhostEaten);
     
-    ghost.sendToHouse();
+    // Reproducir b2b.wav inmediatamente (el fantasma ya está en modo Eyes)
+    AudioManager::get().playSound(SoundID::BackToBase, -1);
+    
+    // Congelar el juego
+    state = GameState::GhostEaten;
+    freezeTimer = FREEZE_TIME;
 }
 
 void Game::pacmanDied() {
-    AudioManager::get().stopAll();
-    AudioManager::get().playSound(SoundID::Death);
+    // Detener todos los sonidos
+    AudioManager::get().stopSiren();
+    AudioManager::get().stopSound(SoundID::Waka);
+    AudioManager::get().stopSound(SoundID::BackToBase);
     
-    pacman.die();
-    state = GameState::Death;
+    // Entrar en estado PreDeath (pausa de 1 segundo)
+    state = GameState::PreDeath;
+    freezeTimer = FREEZE_TIME;
 }
 
 void Game::checkLevelComplete() {
-    if (Map::get().getRemainingDots() == 0) {
-        AudioManager::get().stopAll();
+    if (Map::get().getRemainingDots() <= 0) {
         state = GameState::LevelClear;
-        stateTimer = LEVEL_CLEAR_TIME;
+        levelClearTimer = 0.0f;
+        levelClearBlinkTimer = 0.0f;
+        levelClearBlinkState = false;
+        
+        AudioManager::get().stopSiren();
+        AudioManager::get().stopSound(SoundID::Waka);
+        AudioManager::get().stopSound(SoundID::BackToBase);
     }
 }
 
 void Game::spawnFruit() {
-    if (!fruitEaten && (dotsEaten == 70 || dotsEaten == 170)) {
+    // La fruta aparece después de 70 y 170 dots comidos (primera aparición)
+    if ((dotsEaten == 70 || dotsEaten == 170) && !fruitVisible && !fruitEaten) {
         fruitVisible = true;
         fruitTimer = FRUIT_VISIBLE_TIME;
     }
@@ -447,7 +706,7 @@ void Game::spawnFruit() {
 
 void Game::updateSiren() {
     int remaining = Map::get().getRemainingDots();
-    bool shouldBeFast = remaining < 40;
+    bool shouldBeFast = remaining < 30;
     
     if (shouldBeFast != sirenFast && frightenedTimer <= 0.0f) {
         sirenFast = shouldBeFast;
@@ -469,6 +728,8 @@ void Game::updateFloatingScores(float dt) {
     for (auto& fs : floatingScores) {
         if (fs.active) {
             fs.timer -= dt;
+            fs.y -= 20.0f * dt;
+            
             if (fs.timer <= 0.0f) {
                 fs.active = false;
             }
@@ -510,9 +771,6 @@ void Game::renderFloatingScores() {
 }
 
 void Game::drawPausedText() {
-    SDL_Renderer* sdlRenderer = renderer.getSDLRenderer();
-    
-    // Intentar usar textura de pausa
     auto& tm = TextureManager::get();
     SDL_Texture* pauseTex = tm.getTexture("text_pause");
     
@@ -524,33 +782,63 @@ void Game::drawPausedText() {
             SCREEN_HEIGHT / 2 - (h * SCALE) / 2,
             w * SCALE, h * SCALE);
     }
-    else {
-        // Dibujar "PAUSED" con código
-        const char* text = "PAUSED";
-        int len = 6;
-        int digitWidth = 4 * SCALE;
-        int totalWidth = len * digitWidth;
-        int x = SCREEN_WIDTH / 2 - totalWidth / 2;
-        int y = SCREEN_HEIGHT / 2 - 3 * SCALE;
-        
-        SDL_SetRenderDrawColor(sdlRenderer, 255, 255, 0, 255);
-        
-        // Dibujar cada letra
-        for (int i = 0; i < len; i++) {
-            drawDigitSimple(sdlRenderer, text[i], x + i * digitWidth, y, SCALE);
-        }
+}
+
+void Game::renderHUD() {
+    int hudY = SCREEN_HEIGHT - SCALED_TILE - 4;
+    
+    auto& tm = TextureManager::get();
+    
+    // Vidas
+    for (int i = 0; i < lives - 1; i++) {
+        int x = SCALED_TILE + i * (SCALED_TILE + 4);
+        tm.draw("pacman_life", x, hudY, SCALED_TILE, SCALED_TILE);
+    }
+    
+    // Frutas
+    renderFruitDisplay();
+}
+
+void Game::renderFruitDisplay() {
+    auto& tm = TextureManager::get();
+    int hudY = SCREEN_HEIGHT - SCALED_TILE - 4;
+    
+    std::vector<std::string> fruitsToShow;
+    
+    if (level >= 1) fruitsToShow.push_back("fruit_cherry");
+    if (level >= 2) fruitsToShow.push_back("fruit_strawberry");
+    if (level >= 3) fruitsToShow.push_back("fruit_orange");
+    if (level >= 4) fruitsToShow.push_back("fruit_orange");
+    if (level >= 5) fruitsToShow.push_back("fruit_apple");
+    
+    if (fruitsToShow.size() > 5) {
+        fruitsToShow.erase(fruitsToShow.begin(), fruitsToShow.begin() + (fruitsToShow.size() - 5));
+    }
+    
+    int startX = SCREEN_WIDTH - SCALED_TILE - 4;
+    for (int i = static_cast<int>(fruitsToShow.size()) - 1; i >= 0; i--) {
+        int x = startX - (static_cast<int>(fruitsToShow.size()) - 1 - i) * (SCALED_TILE + 4);
+        tm.draw(fruitsToShow[i], x, hudY, SCALED_TILE, SCALED_TILE);
     }
 }
 
 void Game::render() {
     renderer.clear();
-    renderer.drawMaze();
-    renderer.drawDots();
     
-    // Fruta
-    if (fruitVisible) {
+    // En Level Clear, renderizar animación de parpadeo
+    if (state == GameState::LevelClear) {
+        renderLevelClearAnimation();
+    }
+    else {
+        renderer.drawMaze();
+        renderer.drawDots();
+    }
+    
+    // Fruta en el mapa
+    if (fruitVisible && state != GameState::LevelClear) {
+        FruitInfo fruitInfo = getCurrentFruitInfo();
         TextureManager::get().draw(
-            "cherry",
+            fruitInfo.textureKey,
             13 * SCALED_TILE,
             17 * SCALED_TILE + GAME_OFFSET_Y,
             SCALED_TILE,
@@ -559,7 +847,10 @@ void Game::render() {
     }
     
     // Pac-Man
-    if (state != GameState::PressStart) {
+    bool showPacman = (state != GameState::PressStart && 
+                       state != GameState::LevelClear);
+    
+    if (showPacman) {
         if (state != GameState::Death || !pacman.isDeathAnimationComplete()) {
             std::string pacTexture;
             double angle = 0;
@@ -591,7 +882,12 @@ void Game::render() {
     }
     
     // Fantasmas
-    if (state != GameState::Death && state != GameState::PressStart) {
+    bool showGhosts = (state != GameState::Death && 
+                       state != GameState::PreDeath &&
+                       state != GameState::PressStart && 
+                       state != GameState::LevelClear);
+    
+    if (showGhosts) {
         for (auto& ghost : ghosts) {
             ghost.render(renderer.getSDLRenderer());
         }
@@ -600,47 +896,73 @@ void Game::render() {
     // Puntajes flotantes
     renderFloatingScores();
     
-    // HUD
-    renderer.drawScore(score, highScore, lives);
-    renderer.drawLives(lives);
+    // HUD superior (score)
+    bool shouldBlinkScore = (highScoreBlinkTimer > 0.0f && highScoreBlinkState);
+    bool shouldBlinkHighScoreReset = (highScoreResetBlinkTimer > 0.0f && highScoreResetBlinkState);
     
-    // Textos según estado
+    renderer.drawScore(score, highScore, lives, shouldBlinkScore || shouldBlinkHighScoreReset);
+    
+    // HUD inferior
+    renderHUD();
+    
+    // Textos según estado - centrados dinámicamente
+    auto& tm = TextureManager::get();
+    
     if (state == GameState::PressStart) {
         if (blinkState) {
-            renderer.drawText("text_pressstart",
-                SCREEN_WIDTH / 2 - 44 * SCALE,
-                17 * SCALED_TILE + GAME_OFFSET_Y);
+            SDL_Texture* tex = tm.getTexture("text_pressstart");
+            if (tex) {
+                int w, h;
+                SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
+                int x = SCREEN_WIDTH / 2 - (w * SCALE) / 2;
+                int y = 17 * SCALED_TILE + GAME_OFFSET_Y;
+                renderer.drawText("text_pressstart", x, y);
+            }
         }
     }
     else if (state == GameState::Ready) {
-        renderer.drawText("text_ready", 
-            SCREEN_WIDTH / 2 - 24 * SCALE, 
-            17 * SCALED_TILE + GAME_OFFSET_Y);
+        SDL_Texture* tex = tm.getTexture("text_ready");
+        if (tex) {
+            int w, h;
+            SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
+            int x = SCREEN_WIDTH / 2 - (w * SCALE) / 2;
+            int y = 17 * SCALED_TILE + GAME_OFFSET_Y;
+            renderer.drawText("text_ready", x, y);
+        }
     }
     else if (state == GameState::GameOver) {
-        renderer.drawText("text_gameover",
-            SCREEN_WIDTH / 2 - 40 * SCALE,
-            17 * SCALED_TILE + GAME_OFFSET_Y);
+        SDL_Texture* tex = tm.getTexture("text_gameover");
+        if (tex) {
+            int w, h;
+            SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
+            int x = SCREEN_WIDTH / 2 - (w * SCALE) / 2;
+            int y = 17 * SCALED_TILE + GAME_OFFSET_Y;
+            renderer.drawText("text_gameover", x, y);
+        }
     }
     else if (state == GameState::LevelClear) {
-        renderer.drawText("text_clear",
-            SCREEN_WIDTH / 2 - 24 * SCALE,
-            17 * SCALED_TILE + GAME_OFFSET_Y);
+        SDL_Texture* tex = tm.getTexture("text_clear");
+        if (tex) {
+            int w, h;
+            SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
+            int x = SCREEN_WIDTH / 2 - (w * SCALE) / 2;
+            int y = 17 * SCALED_TILE + GAME_OFFSET_Y;
+            renderer.drawText("text_clear", x, y);
+        }
     }
     else if (state == GameState::Paused) {
         drawPausedText();
     }
     
     renderer.present();
-    
-    if (score > highScore) {
-        highScore = score;
-    }
 }
 
-// Función para dibujar dígitos y letras simples
+void Game::renderLevelClearAnimation() {
+    renderer.drawMazeFlashing(levelClearBlinkState);
+}
+
+// Función para dibujar dígitos simples
 static void drawDigitSimple(SDL_Renderer* renderer, char c, int x, int y, int scale) {
-    // Patrones 3x5 para dígitos
     static const uint8_t digitPatterns[10][5] = {
         {0b111, 0b101, 0b101, 0b101, 0b111}, // 0
         {0b010, 0b110, 0b010, 0b010, 0b111}, // 1
@@ -654,49 +976,9 @@ static void drawDigitSimple(SDL_Renderer* renderer, char c, int x, int y, int sc
         {0b111, 0b101, 0b111, 0b001, 0b111}, // 9
     };
     
-    // Patrones para letras PAUSED
-    static const uint8_t letterPatterns[26][5] = {
-        {0b010, 0b101, 0b111, 0b101, 0b101}, // A
-        {0b110, 0b101, 0b110, 0b101, 0b110}, // B
-        {0b011, 0b100, 0b100, 0b100, 0b011}, // C
-        {0b110, 0b101, 0b101, 0b101, 0b110}, // D
-        {0b111, 0b100, 0b110, 0b100, 0b111}, // E
-        {0b111, 0b100, 0b110, 0b100, 0b100}, // F
-        {0b011, 0b100, 0b101, 0b101, 0b011}, // G
-        {0b101, 0b101, 0b111, 0b101, 0b101}, // H
-        {0b111, 0b010, 0b010, 0b010, 0b111}, // I
-        {0b001, 0b001, 0b001, 0b101, 0b010}, // J
-        {0b101, 0b110, 0b100, 0b110, 0b101}, // K
-        {0b100, 0b100, 0b100, 0b100, 0b111}, // L
-        {0b101, 0b111, 0b111, 0b101, 0b101}, // M
-        {0b101, 0b111, 0b111, 0b111, 0b101}, // N
-        {0b010, 0b101, 0b101, 0b101, 0b010}, // O
-        {0b110, 0b101, 0b110, 0b100, 0b100}, // P
-        {0b010, 0b101, 0b101, 0b110, 0b011}, // Q
-        {0b110, 0b101, 0b110, 0b101, 0b101}, // R
-        {0b011, 0b100, 0b010, 0b001, 0b110}, // S
-        {0b111, 0b010, 0b010, 0b010, 0b010}, // T
-        {0b101, 0b101, 0b101, 0b101, 0b111}, // U
-        {0b101, 0b101, 0b101, 0b101, 0b010}, // V
-        {0b101, 0b101, 0b111, 0b111, 0b101}, // W
-        {0b101, 0b101, 0b010, 0b101, 0b101}, // X
-        {0b101, 0b101, 0b010, 0b010, 0b010}, // Y
-        {0b111, 0b001, 0b010, 0b100, 0b111}, // Z
-    };
+    if (c < '0' || c > '9') return;
     
-    const uint8_t* pattern = nullptr;
-    
-    if (c >= '0' && c <= '9') {
-        pattern = digitPatterns[c - '0'];
-    }
-    else if (c >= 'A' && c <= 'Z') {
-        pattern = letterPatterns[c - 'A'];
-    }
-    else if (c >= 'a' && c <= 'z') {
-        pattern = letterPatterns[c - 'a'];
-    }
-    
-    if (!pattern) return;
+    const uint8_t* pattern = digitPatterns[c - '0'];
     
     for (int row = 0; row < 5; row++) {
         for (int col = 0; col < 3; col++) {
