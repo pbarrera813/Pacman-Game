@@ -49,8 +49,9 @@ constexpr float LEVEL_CLEAR_TIME = 2.0f;   // Tiempo antes de siguiente nivel
 constexpr float FRUIT_VISIBLE_TIME = 10.0f; // Tiempo que la fruta está visible
 
 // Posiciones iniciales (en tiles)
-constexpr int PACMAN_START_X = 13;
-constexpr int PACMAN_START_Y = 23;
+// La posición debe estar en un tile caminable
+constexpr int PACMAN_START_X = 14;  // Centro del mapa (fila 22: "...##................##...")
+constexpr int PACMAN_START_Y = 22;  // Corredor horizontal con pellets
 
 constexpr int GHOST_HOUSE_X = 13;
 constexpr int GHOST_HOUSE_Y = 14;
