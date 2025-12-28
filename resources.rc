@@ -1,0 +1,6 @@
+// resources.rc - Recursos de Windows para Pac-Man
+// Este archivo solo se compila en Windows con windres
+
+// Definir icono de la aplicación
+// IDI_ICON1 es el identificador estándar para el icono principal
+IDI_ICON1 ICON "icon.ico"
