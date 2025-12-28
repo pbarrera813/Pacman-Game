@@ -44,6 +44,10 @@ public:
     bool isPlaying(SoundID id) const;
     bool isAnySoundPlaying() const;
     
+    // Control de volumen
+    void setVolume(int percent);  // 0, 25, 50, 100
+    int getVolume() const { return volumePercent; }
+    
 private:
     AudioManager() = default;
     ~AudioManager() = default;
@@ -58,7 +62,9 @@ private:
     static constexpr int B2B_CHANNEL = 2;      // Canal dedicado para ojos volviendo a casa
     static constexpr int FRUIT_CHANNEL = 3;    // Canal dedicado para sonido de fruta
     static constexpr int HIGHSCORE_CHANNEL = 4; // Canal dedicado para nuevo récord
+    static constexpr int POWERUP_CHANNEL = 5;  // Canal dedicado para modo frightened
     
     bool sirenPlaying = false;
     bool sirenFast = false;
+    int volumePercent = 100;  // Volumen actual (0, 25, 50, 100)
 };

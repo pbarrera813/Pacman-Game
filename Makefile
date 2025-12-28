@@ -1,5 +1,5 @@
 # Makefile para Pac-Man en C++
-# Compatible con MSYS2/MinGW64 (Windows) y Linux
+# Compatible con MSYS2/MinGW64 (Windows), Linux y macOS
 
 # Detectar sistema operativo
 ifeq ($(OS),Windows_NT)
@@ -9,13 +9,30 @@ ifeq ($(OS),Windows_NT)
     MKDIR = if not exist "bin" mkdir bin
     SDL_CFLAGS = $(shell sdl2-config --cflags)
     SDL_LIBS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lSDL2_ttf
+    # Recursos de Windows (icono)
+    WINDRES = windres
+    RES_FILE = resources.rc
+    RES_OBJ = resources.o
+    HAS_ICON = 1
 else
-    # Linux/macOS
-    EXE = pacman
-    RM = rm -f
-    MKDIR = mkdir -p bin
-    SDL_CFLAGS = $(shell sdl2-config --cflags)
-    SDL_LIBS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lSDL2_ttf
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S),Darwin)
+        # macOS
+        EXE = pacman
+        RM = rm -f
+        MKDIR = mkdir -p bin
+        SDL_CFLAGS = $(shell sdl2-config --cflags)
+        SDL_LIBS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lSDL2_ttf
+        HAS_ICON = 0
+    else
+        # Linux
+        EXE = pacman
+        RM = rm -f
+        MKDIR = mkdir -p bin
+        SDL_CFLAGS = $(shell sdl2-config --cflags)
+        SDL_LIBS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lSDL2_ttf
+        HAS_ICON = 0
+    endif
 endif
 
 # Compilador y flags
@@ -37,28 +54,41 @@ SOURCES = Main.cpp \
 # Archivos objeto
 OBJECTS = $(SOURCES:.cpp=.o)
 
+# Agregar recurso de Windows si está disponible
+ifeq ($(HAS_ICON),1)
+    ALL_OBJECTS = $(OBJECTS) $(RES_OBJ)
+else
+    ALL_OBJECTS = $(OBJECTS)
+endif
+
 # Regla principal
 all: $(EXE)
 
-$(EXE): $(OBJECTS)
-	$(CXX) $(OBJECTS) -o $(EXE) $(LDFLAGS)
+$(EXE): $(ALL_OBJECTS)
+	$(CXX) $(ALL_OBJECTS) -o $(EXE) $(LDFLAGS)
 	@echo "Build complete: $(EXE)"
 
 # Compilar archivos .cpp a .o
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+# Compilar recursos de Windows (solo en Windows)
+ifeq ($(HAS_ICON),1)
+$(RES_OBJ): $(RES_FILE)
+	$(WINDRES) $(RES_FILE) -o $(RES_OBJ)
+endif
+
 # Limpiar
 clean:
+ifeq ($(OS),Windows_NT)
+	$(RM) $(OBJECTS) $(RES_OBJ) $(EXE) *.o 2>nul || true
+else
 	$(RM) $(OBJECTS) $(EXE) *.o
+endif
 
 # Ejecutar
 run: $(EXE)
-ifeq ($(OS),Windows_NT)
 	./$(EXE)
-else
-	./$(EXE)
-endif
 
 # Información de debug
 info:
@@ -66,8 +96,9 @@ info:
 	@echo "CXXFLAGS: $(CXXFLAGS)"
 	@echo "LDFLAGS: $(LDFLAGS)"
 	@echo "Sources: $(SOURCES)"
-	@echo "Objects: $(OBJECTS)"
+	@echo "Objects: $(ALL_OBJECTS)"
 	@echo "Executable: $(EXE)"
+	@echo "Has Icon: $(HAS_ICON)"
 
 # Dependencias
 Main.o: Main.cpp Game.h

@@ -143,12 +143,12 @@ void PacMan::updateDeathAnimation(float dt) {
     
     deathTimer += dt;
     
-    // 3 frames de animación de muerte
-    if (deathTimer >= 0.3f) {
+    // 12 frames de animación de muerte (0.1s por frame = 1.2s total)
+    if (deathTimer >= 0.1f) {
         deathTimer = 0.0f;
         deathFrame++;
         
-        if (deathFrame >= 3) {
+        if (deathFrame >= 12) {
             deathAnimComplete = true;
             dying = false;
         }

@@ -105,6 +105,13 @@ void AudioManager::playSound(SoundID id, int loops) {
         return;
     }
     
+    // PowerUp usa canal dedicado (loop durante frightened mode)
+    if (id == SoundID::PowerUp) {
+        Mix_HaltChannel(POWERUP_CHANNEL);
+        channel = Mix_PlayChannel(POWERUP_CHANNEL, it->second, loops);
+        return;
+    }
+    
     // Otros sonidos usan canales libres
     channel = Mix_PlayChannel(-1, it->second, loops);
     if (channel != -1) {
@@ -126,6 +133,11 @@ void AudioManager::stopSound(SoundID id) {
     
     if (id == SoundID::BackToBase) {
         Mix_HaltChannel(B2B_CHANNEL);
+        return;
+    }
+    
+    if (id == SoundID::PowerUp) {
+        Mix_HaltChannel(POWERUP_CHANNEL);
         return;
     }
     
@@ -169,6 +181,9 @@ bool AudioManager::isPlaying(SoundID id) const {
     if (id == SoundID::BackToBase) {
         return Mix_Playing(B2B_CHANNEL) != 0;
     }
+    if (id == SoundID::PowerUp) {
+        return Mix_Playing(POWERUP_CHANNEL) != 0;
+    }
     
     auto it = activeChannels.find(id);
     if (it == activeChannels.end())
@@ -179,4 +194,27 @@ bool AudioManager::isPlaying(SoundID id) const {
 
 bool AudioManager::isAnySoundPlaying() const {
     return Mix_Playing(-1) > 0;
+}
+
+void AudioManager::setVolume(int percent) {
+    // Limitar a valores válidos
+    if (percent <= 0) percent = 0;
+    else if (percent <= 25) percent = 25;
+    else if (percent <= 50) percent = 50;
+    else percent = 100;
+    
+    volumePercent = percent;
+    
+    // Convertir porcentaje a valor de SDL_mixer (0-128)
+    int mixVolume = (MIX_MAX_VOLUME * percent) / 100;
+    
+    // Aplicar volumen a todos los canales
+    Mix_Volume(-1, mixVolume);
+    
+    // También aplicar a chunks individuales por si acaso
+    for (auto& pair : sounds) {
+        if (pair.second) {
+            Mix_VolumeChunk(pair.second, mixVolume);
+        }
+    }
 }
