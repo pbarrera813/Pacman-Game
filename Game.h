@@ -1,5 +1,5 @@
 // Game.h
-// Clase principal
+// Clase principal del juego Pac-Man - Versión 3.2.1
 #pragma once
 
 #include "Pacman.h"
@@ -44,7 +44,7 @@ struct FruitInfo {
     int points;
 };
 
-// Puntaje flotante
+// Puntaje flotante (ahora usa sprites)
 struct FloatingScore {
     std::string textureKey;  // Sprite del puntaje a mostrar
     float x, y;
@@ -111,7 +111,7 @@ private:
     int dotsEaten = 0;
     int ghostsEatenInFright = 0;
     
-    // Puntajes flotantes
+    // Puntajes flotantes (ahora con sprites)
     std::vector<FloatingScore> floatingScores;
     static constexpr float FLOATING_SCORE_TIME = 1.0f;
     
@@ -139,9 +139,6 @@ private:
     
     // Sistemas
     Renderer renderer;
-    
-    // High score file
-    static constexpr const char* HIGHSCORE_FILE = "highscore.dat";
     
     // Métodos
     void loadAllTextures();
@@ -172,6 +169,7 @@ private:
     void renderFruitDisplay();
     
     // High score persistence
+    std::string getHighScorePath() const;
     void loadHighScore();
     void saveHighScore();
     void resetHighScore();

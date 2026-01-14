@@ -1,4 +1,4 @@
-// Game.cpp
+// Game.cpp - Pac-Man Versión 3.0
 #include "Game.h"
 #include "GhostAI.h"
 #include "Map.h"
@@ -10,8 +10,14 @@
 #include <algorithm>
 #include <fstream>
 
+// Windows: para guardar highscore en AppData
+#ifdef _WIN32
+#include <shlobj.h>
+#include <direct.h>
+#endif
+
 // Tiempos de Scatter/Chase
-static const float SCATTER_TIMES[] = {4.0f, 4.0f, 4.0f, 4.0f};
+static const float SCATTER_TIMES[] = {7.0f, 7.0f, 5.0f, 5.0f};
 static const float CHASE_TIMES[] = {20.0f, 20.0f, 20.0f, 999999.0f};
 
 Game::Game() {}
@@ -39,7 +45,7 @@ bool Game::init() {
     ghosts.push_back(Ghost(GhostType::Inky));
     ghosts.push_back(Ghost(GhostType::Clyde));
     
-    // Inicializar área del icono de volumen (se actualizará en renderVolumeIcon)
+    // Inicializar área del icono de volumen
     volumeIconRect = {0, 0, 0, 0};
     
     state = GameState::PressStart;
@@ -47,8 +53,20 @@ bool Game::init() {
     return true;
 }
 
+std::string Game::getHighScorePath() const {
+#ifdef _WIN32
+    char appDataPath[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, appDataPath))) {
+        std::string path = std::string(appDataPath) + "\\PacMan";
+        _mkdir(path.c_str());  // Crear carpeta si no existe
+        return path + "\\highscore.dat";
+    }
+#endif
+    return "highscore.dat";  // Fallback para Linux/Mac o si falla
+}
+
 void Game::loadHighScore() {
-    std::ifstream file(HIGHSCORE_FILE, std::ios::binary);
+    std::ifstream file(getHighScorePath(), std::ios::binary);
     if (file.is_open()) {
         file.read(reinterpret_cast<char*>(&highScore), sizeof(highScore));
         file.close();
@@ -58,7 +76,7 @@ void Game::loadHighScore() {
 }
 
 void Game::saveHighScore() {
-    std::ofstream file(HIGHSCORE_FILE, std::ios::binary);
+    std::ofstream file(getHighScorePath(), std::ios::binary);
     if (file.is_open()) {
         file.write(reinterpret_cast<const char*>(&highScore), sizeof(highScore));
         file.close();
@@ -85,11 +103,6 @@ void Game::loadAllTextures() {
     tm.load("pacman_3", "assets/gfx/pacman/pac_man_3.png");
     tm.load("pacman_4", "assets/gfx/pacman/pac_man_4.png");
     
-    // Pac-Man (sprites direccionales para cuando está quieto)
-    tm.load("pacman_up", "assets/gfx/pacman/pac_man_up.png");
-    tm.load("pacman_down", "assets/gfx/pacman/pac_man_down.png");
-    tm.load("pacman_left", "assets/gfx/pacman/pac_man_left.png");
-    
     // Pac-Man (muerte - 12 frames)
     for (int i = 0; i < 12; i++) {
         std::string key = "pacman_death_" + std::to_string(i);
@@ -100,7 +113,7 @@ void Game::loadAllTextures() {
     // Contador de vidas
     tm.load("pacman_life", "assets/gfx/pacman_counter/lifecounter_0.png");
     
-    // Fantasmas con direcciones
+    // Fantasmas con direcciones (4 fantasmas x 4 direcciones x 2 frames = 32 sprites)
     const char* colors[] = {"red", "pink", "blue", "orange"};
     const char* dirs[] = {"up", "down", "left", "right"};
     
@@ -114,7 +127,7 @@ void Game::loadAllTextures() {
         }
     }
     
-    // Fantasmas asustados (4 frames)
+    // Fantasmas asustados (4 frames: 0-1 azul, 2-3 blanco para parpadeo)
     tm.load("ghost_afraid_0", "assets/gfx/ghost/ghost_afraid/afraid_0.png");
     tm.load("ghost_afraid_1", "assets/gfx/ghost/ghost_afraid/afraid_1.png");
     tm.load("ghost_afraid_2", "assets/gfx/ghost/ghost_afraid/afraid_2.png");
@@ -948,37 +961,14 @@ void Game::render() {
                 pacTexture = "pacman_death_" + std::to_string(pacman.getDeathFrame());
             }
             else {
-                int frame = pacman.getAnimFrame();
+                pacTexture = "pacman_" + std::to_string(pacman.getAnimFrame());
                 
-                // Si está en frame 0 (boca cerrada/quieto), usar sprites direccionales
-                if (frame == 0) {
-                    switch (pacman.direction) {
-                        case Direction::Up:
-                            pacTexture = "pacman_up";
-                            break;
-                        case Direction::Down:
-                            pacTexture = "pacman_down";
-                            break;
-                        case Direction::Left:
-                            pacTexture = "pacman_left";
-                            break;
-                        case Direction::Right:
-                        default:
-                            pacTexture = "pacman_0";  // Derecha es el default
-                            break;
-                    }
-                }
-                else {
-                    // Frames de animación (1-4): usar rotación
-                    pacTexture = "pacman_" + std::to_string(frame);
-                    
-                    switch (pacman.direction) {
-                        case Direction::Right: angle = 0;   break;
-                        case Direction::Down:  angle = 90;  break;
-                        case Direction::Left:  angle = 180; break;
-                        case Direction::Up:    angle = 270; break;
-                        default: break;
-                    }
+                switch (pacman.direction) {
+                    case Direction::Right: angle = 0;   break;
+                    case Direction::Down:  angle = 90;  break;
+                    case Direction::Left:  angle = 180; break;
+                    case Direction::Up:    angle = 270; break;
+                    default: break;
                 }
             }
             
@@ -1117,12 +1107,12 @@ void Game::renderVolumeIcon() {
         int w, h;
         SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
         
-        // Escalar el icono
-        float scale = (volumeLevel ==0 ) ? 0.5 : 1.0f;
+        // Escalar el icono según el tipo (50% para sonido, 25% para mudo)
+        float scale = (volumeLevel == 0) ? 0.5f : 1.0f;
         int iconW = static_cast<int>(w * scale);
         int iconH = static_cast<int>(h * scale);
         
-        // Posición: esquina superior derecha, debajo del HIGH SCORE
+        // Posición: esquina superior derecha
         int iconX = SCREEN_WIDTH - iconW - 8;
         int iconY = 8;
         

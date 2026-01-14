@@ -8,7 +8,7 @@ ifeq ($(OS),Windows_NT)
     RM = del /Q
     MKDIR = if not exist "bin" mkdir bin
     SDL_CFLAGS = $(shell sdl2-config --cflags)
-    SDL_LIBS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lSDL2_ttf
+    SDL_LIBS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lole32 -lshell32
     # Recursos de Windows (icono)
     WINDRES = windres
     RES_FILE = resources.rc
