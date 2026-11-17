@@ -714,7 +714,7 @@ void Game::checkCollisions() {
     
     if (fruitVisible) {
         float fruitX = 13.5f * SCALED_TILE;
-        float fruitY = 17.0f * SCALED_TILE;
+        float fruitY = 17.5f * SCALED_TILE;
         
         float pacCenterX = pacman.position.x + SCALED_TILE / 2.0f;
         float pacCenterY = pacman.position.y + SCALED_TILE / 2.0f;
