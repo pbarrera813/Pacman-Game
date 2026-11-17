@@ -1,5 +1,4 @@
 // GhostAI.h
-// IA de los fantasmas del Pac-Man original
 #pragma once
 
 #include "Ghost.h"

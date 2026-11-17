@@ -7,8 +7,8 @@ ifeq ($(OS),Windows_NT)
     EXE = pacman.exe
     RM = del /Q
     MKDIR = if not exist "bin" mkdir bin
-    SDL_CFLAGS = $(shell sdl2-config --cflags)
-    SDL_LIBS = $(shell sdl2-config --libs) -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lole32 -lshell32
+    SDL_CFLAGS =
+    SDL_LIBS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lole32 -lshell32
     # Recursos de Windows (icono)
     WINDRES = windres
     RES_FILE = resources.rc
@@ -81,7 +81,7 @@ endif
 # Limpiar
 clean:
 ifeq ($(OS),Windows_NT)
-	$(RM) $(OBJECTS) $(RES_OBJ) $(EXE) *.o 2>nul || true
+	-$(RM) $(OBJECTS) $(RES_OBJ) $(EXE) *.o 2>NUL
 else
 	$(RM) $(OBJECTS) $(EXE) *.o
 endif

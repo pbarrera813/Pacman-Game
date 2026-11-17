@@ -90,6 +90,11 @@ void Ghost::setMode(GhostMode m) {
         reverseDirection();
         speed = GHOST_FRIGHT_SPEED;
     }
+    else if ((oldMode == GhostMode::Scatter && m == GhostMode::Chase) ||
+             (oldMode == GhostMode::Chase && m == GhostMode::Scatter)) {
+        reverseDirection();
+        speed = GHOST_SPEED;
+    }
     else if (m == GhostMode::Eyes) {
         speed = GHOST_EYES_SPEED;
     }
@@ -330,8 +335,9 @@ std::string Ghost::getTextureKey() const {
     }
     
     if (mode == GhostMode::Frightened) {
+        // 4 frames: 0-1 azul, 2-3 blanco
         if (blinking && blinkState) {
-            return (animFrame == 0) ? "ghost_afraid_1" : "ghost_afraid_0";
+            return (animFrame == 0) ? "ghost_afraid_2" : "ghost_afraid_3";
         }
         return (animFrame == 0) ? "ghost_afraid_0" : "ghost_afraid_1";
     }
@@ -344,7 +350,16 @@ std::string Ghost::getTextureKey() const {
         case GhostType::Clyde:  color = "orange"; break;
     }
     
-    return "ghost_" + color + "_" + std::to_string(animFrame);
+    std::string dir;
+    switch (direction) {
+        case Direction::Up:    dir = "up";    break;
+        case Direction::Down:  dir = "down";  break;
+        case Direction::Left:  dir = "left";  break;
+        case Direction::Right: dir = "right"; break;
+        default:               dir = "left";  break;
+    }
+    
+    return "ghost_" + color + "_" + dir + "_" + std::to_string(animFrame);
 }
 
 void Ghost::render(SDL_Renderer* /*renderer*/) {

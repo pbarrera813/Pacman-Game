@@ -1,5 +1,4 @@
 // Map.cpp
-// Laberinto fiel al Pac-Man arcade original
 #include "Map.h"
 
 Map& Map::get() {
@@ -120,16 +119,6 @@ bool Map::isWalkable(int x, int y, bool isGhost) const {
 
 bool Map::isTunnel(int x, int y) const {
     return getTile(x, y) == TileType::Tunnel;
-}
-
-bool Map::isIntersection(int x, int y) const {
-    // Cuenta cuántas direcciones son transitables
-    int count = 0;
-    if (isWalkable(x, y - 1, false)) count++;
-    if (isWalkable(x, y + 1, false)) count++;
-    if (isWalkable(x - 1, y, false)) count++;
-    if (isWalkable(x + 1, y, false)) count++;
-    return count > 2;
 }
 
 bool Map::eatDot(int x, int y) {

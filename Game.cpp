@@ -23,7 +23,9 @@ static const float CHASE_TIMES[] = {20.0f, 20.0f, 20.0f, 999999.0f};
 Game::Game() {}
 
 Game::~Game() {
-    saveHighScore();
+    if (highScoreLoaded) {
+        saveHighScore();
+    }
     AudioManager::get().shutdown();
 }
 
@@ -33,9 +35,17 @@ bool Game::init() {
         return false;
     }
     
-    TextureManager::get().init(renderer.getSDLRenderer());
-    loadAllTextures();
-    AudioManager::get().init();
+    if (!TextureManager::get().init(renderer.getSDLRenderer())) {
+        return false;
+    }
+    
+    if (!loadAllTextures()) {
+        return false;
+    }
+    
+    if (!AudioManager::get().init()) {
+        return false;
+    }
     
     loadHighScore();
     previousHighScore = highScore;
@@ -66,13 +76,15 @@ std::string Game::getHighScorePath() const {
 }
 
 void Game::loadHighScore() {
+    highScore = 0;
     std::ifstream file(getHighScorePath(), std::ios::binary);
     if (file.is_open()) {
-        file.read(reinterpret_cast<char*>(&highScore), sizeof(highScore));
-        file.close();
-    } else {
-        highScore = 0;
+        int loadedScore = 0;
+        if (file.read(reinterpret_cast<char*>(&loadedScore), sizeof(loadedScore))) {
+            highScore = loadedScore;
+        }
     }
+    highScoreLoaded = true;
 }
 
 void Game::saveHighScore() {
@@ -93,25 +105,29 @@ void Game::resetHighScore() {
     AudioManager::get().playSound(SoundID::Success);
 }
 
-void Game::loadAllTextures() {
+bool Game::loadAllTextures() {
     auto& tm = TextureManager::get();
+    bool ok = true;
+    auto load = [&tm, &ok](const std::string& id, const std::string& path) {
+        ok = tm.load(id, path) && ok;
+    };
     
     // Pac-Man (movimiento)
-    tm.load("pacman_0", "assets/gfx/pacman/pac_man_0.png");
-    tm.load("pacman_1", "assets/gfx/pacman/pac_man_1.png");
-    tm.load("pacman_2", "assets/gfx/pacman/pac_man_2.png");
-    tm.load("pacman_3", "assets/gfx/pacman/pac_man_3.png");
-    tm.load("pacman_4", "assets/gfx/pacman/pac_man_4.png");
+    load("pacman_0", "assets/gfx/pacman/pac_man_0.png");
+    load("pacman_1", "assets/gfx/pacman/pac_man_1.png");
+    load("pacman_2", "assets/gfx/pacman/pac_man_2.png");
+    load("pacman_3", "assets/gfx/pacman/pac_man_3.png");
+    load("pacman_4", "assets/gfx/pacman/pac_man_4.png");
     
     // Pac-Man (muerte - 12 frames)
     for (int i = 0; i < 12; i++) {
         std::string key = "pacman_death_" + std::to_string(i);
         std::string path = "assets/gfx/pacman_death/pacdeath_" + std::to_string(i) + ".png";
-        tm.load(key, path);
+        load(key, path);
     }
     
     // Contador de vidas
-    tm.load("pacman_life", "assets/gfx/pacman_counter/lifecounter_0.png");
+    load("pacman_life", "assets/gfx/pacman_counter/lifecounter_0.png");
     
     // Fantasmas con direcciones (4 fantasmas x 4 direcciones x 2 frames = 32 sprites)
     const char* colors[] = {"red", "pink", "blue", "orange"};
@@ -122,65 +138,67 @@ void Game::loadAllTextures() {
             for (int frame = 0; frame < 2; frame++) {
                 std::string key = std::string("ghost_") + color + "_" + dir + "_" + std::to_string(frame);
                 std::string path = std::string("assets/gfx/ghost/") + color + "_ghost/ghost_" + color + "_" + dir + "_" + std::to_string(frame) + ".png";
-                tm.load(key, path);
+                load(key, path);
             }
         }
     }
     
     // Fantasmas asustados (4 frames: 0-1 azul, 2-3 blanco para parpadeo)
-    tm.load("ghost_afraid_0", "assets/gfx/ghost/ghost_afraid/afraid_0.png");
-    tm.load("ghost_afraid_1", "assets/gfx/ghost/ghost_afraid/afraid_1.png");
-    tm.load("ghost_afraid_2", "assets/gfx/ghost/ghost_afraid/afraid_2.png");
-    tm.load("ghost_afraid_3", "assets/gfx/ghost/ghost_afraid/afraid_3.png");
+    load("ghost_afraid_0", "assets/gfx/ghost/ghost_afraid/afraid_0.png");
+    load("ghost_afraid_1", "assets/gfx/ghost/ghost_afraid/afraid_1.png");
+    load("ghost_afraid_2", "assets/gfx/ghost/ghost_afraid/afraid_2.png");
+    load("ghost_afraid_3", "assets/gfx/ghost/ghost_afraid/afraid_3.png");
     
     // Ojos de fantasmas
-    tm.load("ghost_eyes_up", "assets/gfx/ghost/eyes/eyes_up.png");
-    tm.load("ghost_eyes_down", "assets/gfx/ghost/eyes/eyes_down.png");
-    tm.load("ghost_eyes_left", "assets/gfx/ghost/eyes/eyes_left.png");
-    tm.load("ghost_eyes_right", "assets/gfx/ghost/eyes/eyes_right.png");
+    load("ghost_eyes_up", "assets/gfx/ghost/eyes/eyes_up.png");
+    load("ghost_eyes_down", "assets/gfx/ghost/eyes/eyes_down.png");
+    load("ghost_eyes_left", "assets/gfx/ghost/eyes/eyes_left.png");
+    load("ghost_eyes_right", "assets/gfx/ghost/eyes/eyes_right.png");
     
     // Pills
-    tm.load("pill", "assets/gfx/pill/pill_0.png");
-    tm.load("super_pill", "assets/gfx/pill/pill_1.png");
+    load("pill", "assets/gfx/pill/pill_0.png");
+    load("super_pill", "assets/gfx/pill/pill_1.png");
     
     // Frutas (8 tipos)
-    tm.load("fruit_cherry", "assets/gfx/fruits/spr_cherry_0.png");
-    tm.load("fruit_strawberry", "assets/gfx/fruits/spr_strawberry_0.png");
-    tm.load("fruit_orange", "assets/gfx/fruits/spr_orange_0.png");
-    tm.load("fruit_apple", "assets/gfx/fruits/spr_apple_0.png");
-    tm.load("fruit_melon", "assets/gfx/fruits/spr_melon_0.png");
-    tm.load("fruit_ship", "assets/gfx/fruits/spr_ship_0.png");
-    tm.load("fruit_bell", "assets/gfx/fruits/spr_bell_0.png");
-    tm.load("fruit_key", "assets/gfx/fruits/spr_key_0.png");
+    load("fruit_cherry", "assets/gfx/fruits/spr_cherry_0.png");
+    load("fruit_strawberry", "assets/gfx/fruits/spr_strawberry_0.png");
+    load("fruit_orange", "assets/gfx/fruits/spr_orange_0.png");
+    load("fruit_apple", "assets/gfx/fruits/spr_apple_0.png");
+    load("fruit_melon", "assets/gfx/fruits/spr_melon_0.png");
+    load("fruit_ship", "assets/gfx/fruits/spr_ship_0.png");
+    load("fruit_bell", "assets/gfx/fruits/spr_bell_0.png");
+    load("fruit_key", "assets/gfx/fruits/spr_key_0.png");
     
     // Sprites de puntaje de frutas
-    tm.load("points_fruit_100", "assets/gfx/points/fruits/first_fruit.png");
-    tm.load("points_fruit_300", "assets/gfx/points/fruits/second_fruit.png");
-    tm.load("points_fruit_500", "assets/gfx/points/fruits/third_fruit.png");
-    tm.load("points_fruit_700", "assets/gfx/points/fruits/fourth_fruit.png");
-    tm.load("points_fruit_1000", "assets/gfx/points/fruits/fifth_fruit.png");
-    tm.load("points_fruit_2000", "assets/gfx/points/fruits/sixth_fruit.png");
-    tm.load("points_fruit_3000", "assets/gfx/points/fruits/seventh_fruit.png");
-    tm.load("points_fruit_5000", "assets/gfx/points/fruits/eight_fruit.png");
+    load("points_fruit_100", "assets/gfx/points/fruits/first_fruit.png");
+    load("points_fruit_300", "assets/gfx/points/fruits/second_fruit.png");
+    load("points_fruit_500", "assets/gfx/points/fruits/third_fruit.png");
+    load("points_fruit_700", "assets/gfx/points/fruits/fourth_fruit.png");
+    load("points_fruit_1000", "assets/gfx/points/fruits/fifth_fruit.png");
+    load("points_fruit_2000", "assets/gfx/points/fruits/sixth_fruit.png");
+    load("points_fruit_3000", "assets/gfx/points/fruits/seventh_fruit.png");
+    load("points_fruit_5000", "assets/gfx/points/fruits/eight_fruit.png");
     
     // Sprites de puntaje de fantasmas
-    tm.load("points_ghost_200", "assets/gfx/points/ghosts/first_ghost.png");
-    tm.load("points_ghost_400", "assets/gfx/points/ghosts/second_ghost.png");
-    tm.load("points_ghost_800", "assets/gfx/points/ghosts/third_ghost.png");
-    tm.load("points_ghost_1600", "assets/gfx/points/ghosts/fourth_ghost.png");
+    load("points_ghost_200", "assets/gfx/points/ghosts/first_ghost.png");
+    load("points_ghost_400", "assets/gfx/points/ghosts/second_ghost.png");
+    load("points_ghost_800", "assets/gfx/points/ghosts/third_ghost.png");
+    load("points_ghost_1600", "assets/gfx/points/ghosts/fourth_ghost.png");
     
     // Textos
-    tm.load("text_ready", "assets/gfx/pacman_text/ready.png");
-    tm.load("text_gameover", "assets/gfx/pacman_text/game_over.png");
-    tm.load("text_clear", "assets/gfx/pacman_text/clear.png");
-    tm.load("text_pressstart", "assets/gfx/pacman_text/enter_0.png");
-    tm.load("text_pause", "assets/gfx/pacman_text/pause.png");
+    load("text_ready", "assets/gfx/pacman_text/ready.png");
+    load("text_gameover", "assets/gfx/pacman_text/game_over.png");
+    load("text_clear", "assets/gfx/pacman_text/clear.png");
+    load("text_pressstart", "assets/gfx/pacman_text/enter_0.png");
+    load("text_pause", "assets/gfx/pacman_text/pause.png");
     
     // Iconos de volumen
-    tm.load("volume_100", "assets/gfx/volume/sound_100.png");
-    tm.load("volume_50", "assets/gfx/volume/sound_50.png");
-    tm.load("volume_25", "assets/gfx/volume/sound_25.png");
-    tm.load("volume_0", "assets/gfx/volume/no_sound.png");
+    load("volume_100", "assets/gfx/volume/sound_100.png");
+    load("volume_50", "assets/gfx/volume/sound_50.png");
+    load("volume_25", "assets/gfx/volume/sound_25.png");
+    load("volume_0", "assets/gfx/volume/no_sound.png");
+    
+    return ok;
 }
 
 FruitInfo Game::getCurrentFruitInfo() const {
@@ -243,15 +261,6 @@ FruitInfo Game::getCurrentFruitInfo() const {
     }
     
     return info;
-}
-
-std::string Game::getGhostPointsTexture(int ghostIndex) const {
-    switch (ghostIndex) {
-        case 0: return "points_ghost_200";
-        case 1: return "points_ghost_400";
-        case 2: return "points_ghost_800";
-        default: return "points_ghost_1600";
-    }
 }
 
 std::string Game::getFruitTextureForLevel(int lvl) const {
@@ -322,7 +331,6 @@ void Game::handleInput() {
                         score = 0;
                         lives = 3;
                         level = 1;
-                        collectedFruits.clear();
                         Map::get().resetLevel();
                         startLevel();
                     }
@@ -373,7 +381,7 @@ void Game::startLevel() {
     fruitEaten = false;
     fruitRespawnTimer = 0.0f;
     floatingScores.clear();
-    
+
     // Reset waka state
     wakaTimer = 0.0f;
     wakaPlaying = false;
@@ -502,13 +510,6 @@ void Game::updateLevelClearAnimation(float dt) {
     
     if (levelClearTimer >= LEVEL_CLEAR_DURATION) {
         level++;
-        
-        if (collectedFruits.size() >= 7) {
-            collectedFruits.erase(collectedFruits.begin());
-        }
-        FruitInfo fruitInfo = getCurrentFruitInfo();
-        collectedFruits.push_back(fruitInfo.type);
-        
         Map::get().resetLevel();
         startLevel();
     }
@@ -996,7 +997,7 @@ void Game::render() {
     bool shouldBlinkScore = (highScoreBlinkTimer > 0.0f && highScoreBlinkState);
     bool shouldBlinkHighScoreReset = (highScoreResetBlinkTimer > 0.0f && highScoreResetBlinkState);
     
-    renderer.drawScore(score, highScore, lives, shouldBlinkScore || shouldBlinkHighScoreReset);
+    renderer.drawScore(score, highScore, shouldBlinkScore || shouldBlinkHighScoreReset);
     
     renderHUD();
     renderVolumeIcon();

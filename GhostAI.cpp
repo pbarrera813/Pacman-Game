@@ -1,5 +1,4 @@
 // GhostAI.cpp
-// IA fiel al Pac-Man arcade original
 #include "GhostAI.h"
 #include "Constants.h"
 #include <cmath>

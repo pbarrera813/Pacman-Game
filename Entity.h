@@ -1,5 +1,4 @@
 // Entity.h
-// Clase base para Pac-Man y Fantasmas
 #pragma once
 
 #include "Math.h"

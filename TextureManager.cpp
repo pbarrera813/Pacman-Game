@@ -57,16 +57,6 @@ void TextureManager::draw(const std::string& id, int x, int y, int w, int h,
     SDL_RenderCopyEx(renderer, tex, nullptr, &dst, angle, nullptr, flip);
 }
 
-void TextureManager::drawFrame(const std::string& id, int x, int y, int w, int h,
-                               int frameX, int frameY, int frameW, int frameH) {
-    SDL_Texture* tex = getTexture(id);
-    if (!tex) return;
-    
-    SDL_Rect src = {frameX, frameY, frameW, frameH};
-    SDL_Rect dst = {x, y, w, h};
-    SDL_RenderCopy(renderer, tex, &src, &dst);
-}
-
 void TextureManager::clear() {
     for (auto& pair : textures) {
         if (pair.second) {

@@ -1,8 +1,6 @@
 // Constants.h
-// Constantes fieles al Pac-Man arcade original
 #pragma once
 
-// Mapa (dimensiones del arcade original)
 constexpr int MAP_WIDTH  = 28;
 constexpr int MAP_HEIGHT = 31;
 constexpr int TILE_SIZE  = 8;   // Tamaño de tile del arcade
@@ -49,8 +47,7 @@ constexpr float LEVEL_CLEAR_TIME = 2.0f;   // Tiempo antes de siguiente nivel
 constexpr float FRUIT_VISIBLE_TIME = 10.0f; // Tiempo que la fruta está visible
 
 // Posiciones iniciales (en tiles)
-// La posición debe estar en un tile caminable
-constexpr int PACMAN_START_X = 14;  // Centro del mapa (fila 22: "...##................##...")
+constexpr int PACMAN_START_X = 14;
 constexpr int PACMAN_START_Y = 22;  // Corredor horizontal con pellets
 
 constexpr int GHOST_HOUSE_X = 13;

@@ -66,5 +66,5 @@ private:
     
     bool sirenPlaying = false;
     bool sirenFast = false;
-    int volumePercent = 100;  // Volumen actual (0, 25, 50, 100)
+    int volumePercent = 100;
 };

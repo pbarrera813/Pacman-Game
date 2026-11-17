@@ -25,8 +25,6 @@ public:
     // Movimiento
     bool isWalkable(int x, int y, bool isGhost = false) const;
     bool isTunnel(int x, int y) const;
-    bool isIntersection(int x, int y) const;
-    
     // Dots
     bool eatDot(int x, int y);
     bool eatPowerPellet(int x, int y);

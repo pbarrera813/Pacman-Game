@@ -98,6 +98,7 @@ private:
     int highScore = 0;
     int previousHighScore = 0;
     bool highScoreBeaten = false;
+    bool highScoreLoaded = false;
     float highScoreBlinkTimer = 0.0f;
     float highScoreBlinkAccum = 0.0f;
     bool highScoreBlinkState = false;
@@ -124,7 +125,6 @@ private:
     bool fruitEaten = false;
     float fruitRespawnTimer = 0.0f;
     static constexpr float FRUIT_RESPAWN_TIME = 35.0f;
-    std::vector<FruitType> collectedFruits;
     
     // Sirena
     bool sirenFast = false;
@@ -141,7 +141,7 @@ private:
     Renderer renderer;
     
     // Métodos
-    void loadAllTextures();
+    bool loadAllTextures();
     void startLevel();
     void resetPositions();
     void updatePlaying(float dt);
@@ -175,7 +175,6 @@ private:
     void resetHighScore();
     
     // Helpers
-    std::string getGhostPointsTexture(int ghostIndex) const;
     std::string getFruitTextureForLevel(int lvl) const;
     
     // Control de volumen

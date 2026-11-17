@@ -24,7 +24,6 @@ void PacMan::reset() {
     
     ateDot = false;
     atePowerPellet = false;
-    ateFruit = false;
     
     animTimer = 0.0f;
     animFrame = 0;
@@ -69,7 +68,6 @@ void PacMan::update(float dt) {
     // Reset eventos
     ateDot = false;
     atePowerPellet = false;
-    ateFruit = false;
     eating = false;
     
     // Solo cambiar dirección cuando está centrado en un tile

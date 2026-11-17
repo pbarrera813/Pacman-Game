@@ -21,10 +21,6 @@ public:
     void draw(const std::string& id, int x, int y, int w, int h, 
               double angle = 0.0, SDL_RendererFlip flip = SDL_FLIP_NONE);
     
-    // Dibujar con source rect
-    void drawFrame(const std::string& id, int x, int y, int w, int h,
-                   int frameX, int frameY, int frameW, int frameH);
-    
     void clear();
     
 private:

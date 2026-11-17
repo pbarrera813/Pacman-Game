@@ -241,7 +241,7 @@ void Renderer::drawNumber(int number, int x, int y) {
     SDL_FreeSurface(surface);
 }
 
-void Renderer::drawScore(int score, int highScore, int /*lives*/, bool blinkScore) {
+void Renderer::drawScore(int score, int highScore, bool blinkScore) {
     if (!font) return;
     
     SDL_Color white = {255, 255, 255, 255};
@@ -308,24 +308,6 @@ void Renderer::drawScore(int score, int highScore, int /*lives*/, bool blinkScor
             SDL_FreeSurface(surfHigh);
         }
     }
-}
-
-void Renderer::drawLives(int lives) {
-    auto& tm = TextureManager::get();
-    
-    int y = SCREEN_HEIGHT - 2 * SCALED_TILE;
-    
-    for (int i = 0; i < lives - 1; i++) {
-        int x = (2 + i * 2) * SCALED_TILE;
-        tm.draw("pacman_life", x, y, SCALED_TILE * 13 / 8, SCALED_TILE * 13 / 8);
-    }
-}
-
-void Renderer::drawFruit() {
-    auto& tm = TextureManager::get();
-    tm.draw("cherry", SCREEN_WIDTH - 3 * SCALED_TILE, 
-            SCREEN_HEIGHT - 2 * SCALED_TILE, 
-            SCALED_TILE * 13 / 8, SCALED_TILE * 13 / 8);
 }
 
 void Renderer::drawText(const std::string& textureId, int x, int y) {

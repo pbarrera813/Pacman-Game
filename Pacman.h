@@ -1,5 +1,4 @@
 // Pacman.h
-// Clase del jugador Pac-Man
 #pragma once
 
 #include "Entity.h"
@@ -24,7 +23,6 @@ public:
     // Eventos del último frame
     bool ateDot = false;
     bool atePowerPellet = false;
-    bool ateFruit = false;
     
     // Animación de muerte
     void die();

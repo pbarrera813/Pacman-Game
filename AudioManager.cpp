@@ -16,22 +16,26 @@ bool AudioManager::init() {
     // Reservar canales
     Mix_AllocateChannels(16);
     
-    // Cargar todos los sonidos
-    loadSound(SoundID::Startup,     "assets/sounds/startup.ogg");
-    loadSound(SoundID::Waka,        "assets/sounds/eating.wav");
-    loadSound(SoundID::PowerUp,     "assets/sounds/powerup.wav");
-    loadSound(SoundID::GhostEaten,  "assets/sounds/ghost_eaten.wav");
-    loadSound(SoundID::BackToBase,  "assets/sounds/b2b.wav");
-    loadSound(SoundID::Death,       "assets/sounds/death.wav");
-    loadSound(SoundID::Fruit,       "assets/sounds/fruit.wav");
-    loadSound(SoundID::Siren,       "assets/sounds/siren.ogg");
-    loadSound(SoundID::SirenFast,   "assets/sounds/siren2.ogg");
-    loadSound(SoundID::HighScore,   "assets/sounds/high-score.ogg");
-    loadSound(SoundID::Pause,       "assets/sounds/pause.wav");
-    loadSound(SoundID::Unpause,     "assets/sounds/unpause.wav");
-    loadSound(SoundID::Success,     "assets/sounds/success.wav");
+    bool ok = true;
+    auto load = [this, &ok](SoundID id, const std::string& path) {
+        ok = loadSound(id, path) && ok;
+    };
     
-    return true;
+    load(SoundID::Startup,     "assets/sounds/startup.ogg");
+    load(SoundID::Waka,        "assets/sounds/eating.wav");
+    load(SoundID::PowerUp,     "assets/sounds/powerup.wav");
+    load(SoundID::GhostEaten,  "assets/sounds/ghost_eaten.wav");
+    load(SoundID::BackToBase,  "assets/sounds/b2b.wav");
+    load(SoundID::Death,       "assets/sounds/death.wav");
+    load(SoundID::Fruit,       "assets/sounds/fruit.wav");
+    load(SoundID::Siren,       "assets/sounds/siren.ogg");
+    load(SoundID::SirenFast,   "assets/sounds/siren2.ogg");
+    load(SoundID::HighScore,   "assets/sounds/high-score.ogg");
+    load(SoundID::Pause,       "assets/sounds/pause.wav");
+    load(SoundID::Unpause,     "assets/sounds/unpause.wav");
+    load(SoundID::Success,     "assets/sounds/success.wav");
+    
+    return ok;
 }
 
 void AudioManager::shutdown() {
@@ -211,7 +215,6 @@ void AudioManager::setVolume(int percent) {
     // Aplicar volumen a todos los canales
     Mix_Volume(-1, mixVolume);
     
-    // También aplicar a chunks individuales por si acaso
     for (auto& pair : sounds) {
         if (pair.second) {
             Mix_VolumeChunk(pair.second, mixVolume);
