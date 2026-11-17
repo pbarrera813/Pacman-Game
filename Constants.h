@@ -58,16 +58,16 @@ constexpr int GHOST_HOUSE_Y = 14;
 
 // Scatter corners (esquinas de dispersión)
 constexpr int BLINKY_SCATTER_X = 25;
-constexpr int BLINKY_SCATTER_Y = 0;
+constexpr int BLINKY_SCATTER_Y = -3;
 
 constexpr int PINKY_SCATTER_X = 2;
-constexpr int PINKY_SCATTER_Y = 0;
+constexpr int PINKY_SCATTER_Y = -3;
 
 constexpr int INKY_SCATTER_X = 27;
-constexpr int INKY_SCATTER_Y = 30;
+constexpr int INKY_SCATTER_Y = 31;
 
 constexpr int CLYDE_SCATTER_X = 0;
-constexpr int CLYDE_SCATTER_Y = 30;
+constexpr int CLYDE_SCATTER_Y = 31;
 
 // Animación
 constexpr float PACMAN_ANIM_SPEED = 0.05f;

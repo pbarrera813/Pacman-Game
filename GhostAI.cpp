@@ -20,12 +20,6 @@ Vector2 GhostAI::getTarget(const Ghost& ghost, const PacMan& pacman, const Ghost
         return tileToPixel(GHOST_HOUSE_X, 11);
     }
     
-    // Modo Frightened: movimiento aleatorio (ia de fantasmas invertida para esto)
-    if (mode == GhostMode::Frightened) {
-        // En el original es aleatorio, pero para simplificar huyen de Pac-Man
-        return Vector2(pacman.position.x, pacman.position.y);
-    }
-    
     // Modo Scatter: ir a esquina asignada
     if (mode == GhostMode::Scatter) {
         return getScatterTarget(ghost.getType());

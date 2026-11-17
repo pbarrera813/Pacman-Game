@@ -372,18 +372,12 @@ void Game::startLevel() {
     fruitVisible = false;
     fruitEaten = false;
     fruitRespawnTimer = 0.0f;
-    frightenedTimer = 0.0f;
-    ghostsEatenInFright = 0;
     floatingScores.clear();
     
     // Reset waka state
     wakaTimer = 0.0f;
     wakaPlaying = false;
-    
-    inScatterMode = true;
-    scatterChasePhase = 0;
-    scatterChaseTimer = SCATTER_TIMES[0];
-    
+
     state = GameState::Ready;
     stateTimer = READY_TIME;
 }
@@ -396,6 +390,12 @@ void Game::resetPositions() {
         ghost.reset();
         ghost.setSpeedMultiplier(getSpeedMultiplier());
     }
+
+    frightenedTimer = 0.0f;
+    ghostsEatenInFright = 0;
+    inScatterMode = true;
+    scatterChasePhase = 0;
+    scatterChaseTimer = SCATTER_TIMES[0];
 }
 
 void Game::update(float dt) {
@@ -596,6 +596,9 @@ void Game::updatePlaying(float dt) {
     
     Ghost* blinky = &ghosts[0];
     for (auto& ghost : ghosts) {
+        if (ghost.isInHouse() && ghost.getMode() != GhostMode::Frightened) {
+            ghost.setMode(inScatterMode ? GhostMode::Scatter : GhostMode::Chase);
+        }
         Vector2 target = GhostAI::getTarget(ghost, pacman, blinky);
         ghost.setTarget(target);
         ghost.update(dt);
@@ -696,14 +699,8 @@ void Game::activateFrightenedMode() {
 }
 
 void Game::checkCollisions() {
-    int pacTileX = pacman.getTileX();
-    int pacTileY = pacman.getTileY();
-    
     for (auto& ghost : ghosts) {
-        int ghostTileX = ghost.getTileX();
-        int ghostTileY = ghost.getTileY();
-        
-        if (pacTileX == ghostTileX && pacTileY == ghostTileY) {
+        if (ghost.position.distance(pacman.position) < SCALED_TILE * 0.6f) {
             if (ghost.getMode() == GhostMode::Frightened) {
                 eatGhost(ghost);
                 return;

@@ -67,7 +67,8 @@ private:
     bool exitingHouse = false;
     bool enteringHouse = false;
     float houseTimer = 0.0f;
-    int exitPhase = 0;  // 0=esperar, 1=centrar X, 2=subir
+    int exitPhase = 0;
+    int decidedTile = -1;
     
     // Animación
     int animFrame = 0;
@@ -77,6 +78,7 @@ private:
     bool blinkState = false;
     
     // Movimiento
+    void move(float dt);
     bool canMove(Direction dir) const;
     Direction chooseDirection() const;
     void handleTunnelWrap();

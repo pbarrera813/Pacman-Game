@@ -4,7 +4,9 @@
 #include "Map.h"
 #include "Constants.h"
 #include "TextureManager.h"
+#include <algorithm>
 #include <cmath>
+#include <random>
 
 // Posiciones clave de la casa de fantasmas (en tiles)
 // La puerta "--" está en fila 12, columnas 13-14
@@ -23,7 +25,8 @@ void Ghost::reset() {
     speedMultiplier = 1.0f;
     enteringHouse = false;
     exitPhase = 0;
-    
+    decidedTile = -1;
+
     animFrame = 0;
     animTimer = 0.0f;
     blinking = false;
@@ -31,10 +34,8 @@ void Ghost::reset() {
     blinkState = false;
     houseTimer = 0.0f;
     
-    // Posiciones iniciales según tipo
     switch (type) {
         case GhostType::Blinky:
-            // Blinky empieza FUERA de la casa, arriba de la puerta
             position.x = (HOUSE_DOOR_X * TILE_SIZE + TILE_SIZE / 2) * SCALE;
             position.y = HOUSE_ABOVE_DOOR_Y * TILE_SIZE * SCALE;
             direction = Direction::Left;
@@ -43,7 +44,6 @@ void Ghost::reset() {
             break;
             
         case GhostType::Pinky:
-            // Pinky en el centro de la casa
             position.x = (HOUSE_DOOR_X * TILE_SIZE + TILE_SIZE / 2) * SCALE;
             position.y = HOUSE_CENTER_Y * TILE_SIZE * SCALE;
             direction = Direction::Down;
@@ -52,7 +52,6 @@ void Ghost::reset() {
             break;
             
         case GhostType::Inky:
-            // Inky a la izquierda en la casa
             position.x = (11 * TILE_SIZE + TILE_SIZE / 2) * SCALE;
             position.y = HOUSE_CENTER_Y * TILE_SIZE * SCALE;
             direction = Direction::Up;
@@ -61,7 +60,6 @@ void Ghost::reset() {
             break;
             
         case GhostType::Clyde:
-            // Clyde a la derecha en la casa
             position.x = (15 * TILE_SIZE + TILE_SIZE / 2) * SCALE;
             position.y = HOUSE_CENTER_Y * TILE_SIZE * SCALE;
             direction = Direction::Up;
@@ -102,6 +100,7 @@ void Ghost::setMode(GhostMode m) {
 
 void Ghost::reverseDirection() {
     direction = oppositeDirection(direction);
+    decidedTile = -1;
 }
 
 void Ghost::sendToHouse() {
@@ -138,13 +137,16 @@ Direction Ghost::chooseDirection() const {
     Direction priorities[] = {Direction::Up, Direction::Left, Direction::Down, Direction::Right};
     
     for (Direction d : priorities) {
-        // No puede dar vuelta en U
         if (d == oppositeDirection(direction))
             continue;
         
         if (!canMove(d))
             continue;
-        
+
+        if (d == Direction::Up && ty == HOUSE_ABOVE_DOOR_Y && (tx == 12 || tx == 15) &&
+            (mode == GhostMode::Chase || mode == GhostMode::Scatter))
+            continue;
+
         int nx = tx, ny = ty;
         switch (d) {
             case Direction::Up:    ny--; break;
@@ -158,9 +160,9 @@ Direction Ghost::chooseDirection() const {
         float dy = (ny * TILE_SIZE * SCALE) - target.y;
         float dist = dx * dx + dy * dy;
         
-        // En Frightened, maximizar distancia
         if (mode == GhostMode::Frightened) {
-            dist = -dist;
+            static std::mt19937 rng{std::random_device{}()};
+            dist = static_cast<float>(rng() & 0xFFFF);
         }
         
         if (dist < bestDist) {
@@ -169,7 +171,6 @@ Direction Ghost::chooseDirection() const {
         }
     }
     
-    // Si no hay opción válida, intentar la opuesta
     if (best == Direction::None) {
         Direction opp = oppositeDirection(direction);
         if (canMove(opp)) {
@@ -194,14 +195,12 @@ void Ghost::handleTunnelWrap() {
 }
 
 void Ghost::update(float dt) {
-    // Animación siempre activa
     animTimer += dt;
     if (animTimer >= GHOST_ANIM_SPEED) {
         animTimer = 0.0f;
         animFrame = (animFrame + 1) % 2;
     }
     
-    // Parpadeo en modo Frightened
     if (blinking && mode == GhostMode::Frightened) {
         blinkTimer += dt;
         if (blinkTimer >= BLINK_SPEED) {
@@ -209,12 +208,19 @@ void Ghost::update(float dt) {
             blinkState = !blinkState;
         }
     }
-    
-    // ===== DENTRO DE LA CASA =====
+
+    // Each step must stay well under the 6 px isCentered window or the turn is skipped.
+    int steps = std::max(1, static_cast<int>(std::ceil(dt * speed * speedMultiplier / 2.0f)));
+    for (int i = 0; i < steps; i++) {
+        move(dt / steps);
+    }
+}
+
+void Ghost::move(float dt) {
     if (inHouse) {
+        decidedTile = -1;
         houseTimer += dt;
         
-        // Esperar delay para empezar a salir
         if (!exitingHouse && houseTimer >= getExitDelay()) {
             exitingHouse = true;
             exitPhase = 0;
@@ -225,7 +231,6 @@ void Ghost::update(float dt) {
             float centerX = (HOUSE_DOOR_X * TILE_SIZE + TILE_SIZE / 2) * SCALE;
             float exitY = HOUSE_ABOVE_DOOR_Y * TILE_SIZE * SCALE;
             
-            // Fase 0: Moverse al centro horizontal
             if (exitPhase == 0) {
                 float diffX = centerX - position.x;
                 if (std::abs(diffX) > exitSpeed) {
@@ -235,12 +240,10 @@ void Ghost::update(float dt) {
                     exitPhase = 1;
                 }
             }
-            // Fase 1: Subir hacia la salida
             else if (exitPhase == 1) {
                 position.y -= exitSpeed;
                 if (position.y <= exitY) {
                     position.y = exitY;
-                    // Salir exitoso
                     inHouse = false;
                     exitingHouse = false;
                     exitPhase = 0;
@@ -252,19 +255,15 @@ void Ghost::update(float dt) {
         return;  // No hacer nada más si está en la casa
     }
     
-    // ===== MODO EYES: Volviendo a la casa =====
     if (mode == GhostMode::Eyes) {
-        // Posiciones clave en píxeles
         float doorCenterX = (HOUSE_DOOR_X * TILE_SIZE + TILE_SIZE / 2) * SCALE;
         float aboveDoorY = HOUSE_ABOVE_DOOR_Y * TILE_SIZE * SCALE;
         float insideY = HOUSE_CENTER_Y * TILE_SIZE * SCALE;
         
-        // Verificar si esta en casa
         if (enteringHouse) {
             position.y += speed * dt * 0.8f;
             if (position.y >= insideY) {
                 position.y = insideY;
-                // Llegó al centro, regenerarse
                 enteringHouse = false;
                 inHouse = true;
                 exitingHouse = true;
@@ -276,13 +275,10 @@ void Ghost::update(float dt) {
             return;
         }
         
-        // Verificar si llegó arriba de la puerta
         int tx = getTileX();
         int ty = getTileY();
         
-        // Verificar si esta arriba de la puerta
         if ((tx == HOUSE_DOOR_X || tx == HOUSE_DOOR_X + 1) && ty == HOUSE_ABOVE_DOOR_Y) {
-            // Centrar horizontalmente y empezar a bajar
             float diffX = doorCenterX - position.x;
             if (std::abs(diffX) > speed * dt) {
                 position.x += (diffX > 0) ? speed * dt : -speed * dt;
@@ -294,24 +290,23 @@ void Ghost::update(float dt) {
             return;
         }
         
-        // Target: el espacio arriba de la puerta
         target.x = doorCenterX;
         target.y = aboveDoorY;
     }
     
-    // MOVIMIENTO NORMAL
-    // Solo cambiar dirección cuando está centrado en un tile
     if (isCentered()) {
-        direction = chooseDirection();
+        int tile = getTileY() * MAP_WIDTH + getTileX();
+        if (tile != decidedTile) {
+            decidedTile = tile;
+            direction = chooseDirection();
+        }
     }
     
-    // Velocidad (más lento en túneles excepto en modo Eyes)
     float currentSpeed = speed * speedMultiplier;  // Aplicar multiplicador de nivel
     if (mode != GhostMode::Eyes && Map::get().isTunnel(getTileX(), getTileY())) {
         currentSpeed = GHOST_TUNNEL_SPEED * speedMultiplier;
     }
     
-    // Mover
     switch (direction) {
         case Direction::Up:    position.y -= currentSpeed * dt; break;
         case Direction::Down:  position.y += currentSpeed * dt; break;
