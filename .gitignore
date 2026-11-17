@@ -1,0 +1,35 @@
+# local agents sessions
+.agents/
+.codex/
+.claude/
+
+# CMake
+*.o
+*.obj
+*.exe
+build/
+out/
+vcpkg_installed/
+
+# Installer script and resulting installer
+installer/
+
+# License file (never tracked)
+license.txt
+license.md
+
+# Highscore file
+highscore.dat
+
+# Windows reserved device name; the stray file cannot be staged
+nul
+
+# IDE and editor files
+
+.vscode/
+.vs/
+*.user
+*.swp
+*~
+Thumbs.db
+.DS_Store
